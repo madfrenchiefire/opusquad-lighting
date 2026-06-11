@@ -13,7 +13,7 @@ import logging
 import threading
 from .artnet_sender import ArtNetSender
 from .fixture import SlimPar56
-from .shows import BaseShow, get_show
+from .shows import BaseShow, get_show, IdleShow
 from .opus_link import OpusQuadLink, BeatInfo
 
 log = logging.getLogger(__name__)
@@ -41,17 +41,19 @@ class LightingEngine:
 
         # Beat tracking
         self._bpm = fallback_bpm
-        self._beat_time = time.monotonic()   # timestamp of last beat
+        self._beat_time = time.monotonic()
         self._beat_number = 1
         self._using_fallback = True
 
         # Register beat callback
         self._opus.on_beat(self._on_beat)
 
-        # Active show
-        self._show: BaseShow = get_show(show_name, fixtures, brightness)
+        # Active show — user-selected show and a shared idle show
         self._brightness = brightness
         self._show_name = show_name
+        self._active_show: BaseShow = get_show(show_name, fixtures, brightness)
+        self._idle_show: IdleShow = IdleShow(fixtures, brightness)
+        self._is_idle = False
 
     def _on_beat(self, info: BeatInfo) -> None:
         self._bpm = info.bpm
@@ -67,14 +69,20 @@ class LightingEngine:
         elapsed = time.monotonic() - self._beat_time
         return min((elapsed % beat_duration) / beat_duration, 0.9999)
 
+    @property
+    def _show(self) -> BaseShow:
+        """Returns the idle show when all decks are paused, otherwise the active show."""
+        return self._idle_show if self._is_idle else self._active_show
+
     def switch_show(self, name: str) -> None:
         self._show_name = name
-        self._show = get_show(name, self._fixtures, self._brightness)
+        self._active_show = get_show(name, self._fixtures, self._brightness)
         log.info("Switched to show: %s", name)
 
     def set_brightness(self, value: float) -> None:
         self._brightness = max(0.0, min(1.0, value))
-        self._show.brightness = self._brightness
+        self._active_show.brightness = self._brightness
+        self._idle_show.brightness = self._brightness
 
     def start(self) -> None:
         self._running = True
@@ -104,6 +112,12 @@ class LightingEngine:
                     log.info("No DJ Link signal — using fallback BPM %.1f", self._fallback_bpm)
                     self._using_fallback = True
                 self._bpm = self._fallback_bpm
+
+            # Switch to idle blue when all decks are paused
+            was_idle = self._is_idle
+            self._is_idle = self._opus.all_paused
+            if self._is_idle != was_idle:
+                log.info("→ %s", "Idle (all decks paused)" if self._is_idle else f"Show: {self._show_name}")
 
             self._show.update(
                 dt=dt,

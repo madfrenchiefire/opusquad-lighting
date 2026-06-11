@@ -220,6 +220,27 @@ class ThunderstormShow(BaseShow):
 
 
 # ---------------------------------------------------------------------------
+# Idle Blue — dim blue wash shown automatically when all decks are paused.
+# Breathes slowly so the lights don't look dead; snaps back to the active
+# show the moment any deck starts playing again.
+# ---------------------------------------------------------------------------
+class IdleShow(BaseShow):
+    name = "idle"
+
+    # How dim the idle wash sits (fraction of master brightness)
+    IDLE_LEVEL = 0.25
+
+    def _render(self, dt, beat_phase, bpm, beat_number):
+        # Slow breath: one inhale/exhale every ~4 seconds
+        breath = (1.0 + math.sin(self._elapsed * (2 * math.pi / 4.0))) / 2.0
+        level = self.IDLE_LEVEL + breath * 0.10   # 0.25 → 0.35 range
+        for fix in self.fixtures:
+            fix.color = COLORS["blue"]
+            fix.strobe = 0
+            fix.dimmer = round(255 * level * self.brightness)
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 ALL_SHOWS: dict[str, type[BaseShow]] = {
@@ -227,6 +248,7 @@ ALL_SHOWS: dict[str, type[BaseShow]] = {
     for cls in [
         BeatStrobeShow, ColorCycleShow, PulseShow,
         ChaseShow, FireShow, RainbowShow, ThunderstormShow,
+        IdleShow,
     ]
 }
 
