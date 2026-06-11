@@ -53,6 +53,21 @@ opus_quad:
   status_port: 50002
   announce_port: 50000
 
+# ---------------------------------------------------------------------------
+# Physical DMX controller input (optional)
+# ---------------------------------------------------------------------------
+# The ARS2048B can receive DMX from a physical controller on Port 3 or 4
+# and re-broadcast it as Art-Net. Set the port direction to "Input" in the
+# node's web UI, set input_universe to match, then enable below.
+#
+# Default channel mapping (see src/artnet_receiver.py to customise):
+#   Ch 1 → master brightness fader
+#   Ch 2 → show selector (fader sweeps through all 7 shows)
+dmx_input:
+  enabled: false
+  universe: 2          # must match the universe set on the ARS2048B input port
+
+# ---------------------------------------------------------------------------
 # Light show settings
 show:
   # BPM to use when no Opus Quad signal is detected

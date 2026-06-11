@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpusQuad Lighting</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0f0f13;
+    --panel:   #1a1a22;
+    --border:  #2e2e3e;
+    --accent:  #7c3aed;
+    --accent2: #06b6d4;
+    --green:   #22c55e;
+    --red:     #ef4444;
+    --yellow:  #eab308;
+    --text:    #e2e8f0;
+    --muted:   #64748b;
+    --radius:  10px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  /* ---- HEADER ---- */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+  }
+  .header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: .5px; }
+  .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--muted); flex-shrink: 0;
+    transition: background .4s;
+  }
+  .dot.connected    { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.disconnected { background: var(--red); }
+  .dot.fallback     { background: var(--yellow); }
+  .bpm-display {
+    font-size: 2.2rem; font-weight: 800; font-variant-numeric: tabular-nums;
+    letter-spacing: -1px; color: var(--accent2); margin-left: auto;
+  }
+  .bpm-label { font-size: .7rem; color: var(--muted); text-align: right; }
+  .beats { display: flex; gap: 5px; margin-left: 8px; }
+  .beat-pip {
+    width: 10px; height: 10px; border-radius: 3px;
+    background: var(--border); transition: background .05s;
+  }
+  .beat-pip.active { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .idle-badge {
+    display: none;
+    background: #1e3a5f; color: var(--accent2);
+    border: 1px solid var(--accent2);
+    padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 600;
+  }
+  .idle-badge.visible { display: block; }
+
+  /* ---- DECKS ---- */
+  .decks {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 600px) { .decks { grid-template-columns: repeat(2, 1fr); } }
+  .deck-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    text-align: center;
+    transition: border-color .3s;
+  }
+  .deck-card.playing { border-color: var(--green); }
+  .deck-label { font-size: .7rem; color: var(--muted); margin-bottom: 4px; }
+  .deck-state { font-size: 1.1rem; margin-bottom: 4px; }
+  .deck-bpm { font-size: .85rem; color: var(--accent2); font-variant-numeric: tabular-nums; }
+
+  /* ---- CONTROLS ---- */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .panel-title {
+    font-size: .8rem; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+
+  .show-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+  }
+  .show-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: .85rem;
+    font-weight: 500;
+    transition: all .15s;
+    text-align: center;
+  }
+  .show-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .show-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(124,58,237,.4);
+  }
+
+  /* brightness */
+  .brightness-row { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+  .brightness-row label { font-size: .85rem; color: var(--muted); min-width: 80px; }
+  input[type=range] {
+    flex: 1; -webkit-appearance: none; height: 6px;
+    background: var(--border); border-radius: 3px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+  .brightness-val { min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ---- CONFIG ACCORDION ---- */
+  .accordion-header {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none;
+  }
+  .accordion-header .chevron { transition: transform .2s; }
+  .accordion-header.open .chevron { transform: rotate(180deg); }
+  .accordion-body { display: none; padding-top: 16px; }
+  .accordion-body.open { display: block; }
+
+  .form-section { margin-bottom: 20px; }
+  .form-section h3 { font-size: .8rem; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .8px; }
+  .form-row { display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
+  .form-group label { font-size: .78rem; color: var(--muted); }
+  .form-group input {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 7px 10px; border-radius: 6px;
+    font-size: .9rem; outline: none; transition: border-color .15s;
+  }
+  .form-group input:focus { border-color: var(--accent); }
+
+  /* fixture table */
+  .fixture-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  .fixture-table th {
+    font-size: .75rem; color: var(--muted); text-align: left;
+    padding: 6px 8px; border-bottom: 1px solid var(--border);
+  }
+  .fixture-table td { padding: 5px 4px; }
+  .fixture-table input {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 5px 8px; border-radius: 5px;
+    font-size: .85rem; width: 100%; outline: none;
+  }
+  .fixture-table input:focus { border-color: var(--accent); }
+  .btn-icon {
+    background: none; border: none; cursor: pointer; color: var(--red);
+    font-size: 1.1rem; padding: 4px;
+  }
+  .btn-icon:hover { color: #f87171; }
+
+  /* buttons */
+  .btn {
+    padding: 8px 16px; border-radius: 7px; font-size: .85rem;
+    font-weight: 600; cursor: pointer; border: none; transition: all .15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #6d28d9; }
+  .btn-secondary {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 5px 10px; font-size: .8rem; }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+  /* discovery results */
+  #discover-results { margin-top: 10px; }
+  .node-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;
+  }
+  .node-info { font-size: .85rem; }
+  .node-ip { color: var(--accent2); font-weight: 600; }
+
+  /* toast */
+  #toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: var(--green); color: #000;
+    padding: 10px 18px; border-radius: 8px;
+    font-size: .85rem; font-weight: 600;
+    opacity: 0; transition: opacity .3s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+  #toast.error { background: var(--red); color: #fff; }
+
+  /* freestyler note */
+  .info-box {
+    background: #1e2a1e; border: 1px solid #2d4a2d;
+    border-radius: 8px; padding: 12px 14px;
+    font-size: .82rem; line-height: 1.5; color: #a7d9a7;
+    margin-top: 8px;
+  }
+  .info-box strong { color: #6ee7b7; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="dot" id="conn-dot"></div>
+  <div>
+    <h1>OpusQuad Lighting</h1>
+    <div id="conn-label" style="font-size:.75rem;color:var(--muted)">Connecting…</div>
+  </div>
+  <span class="idle-badge" id="idle-badge">⏸ PAUSED</span>
+  <div style="margin-left:auto;text-align:right">
+    <div class="bpm-display" id="bpm-display">—</div>
+    <div class="bpm-label">BPM</div>
+  </div>
+  <div>
+    <div class="beats" id="beat-pips">
+      <div class="beat-pip" id="pip-1"></div>
+      <div class="beat-pip" id="pip-2"></div>
+      <div class="beat-pip" id="pip-3"></div>
+      <div class="beat-pip" id="pip-4"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DECK STATUS -->
+<div class="decks" id="decks">
+  <div class="deck-card" id="deck-1"><div class="deck-label">DECK 1</div><div class="deck-state">—</div><div class="deck-bpm">—</div></div>
+  <div class="deck-card" id="deck-2"><div class="deck-label">DECK 2</div><div class="deck-state">—</div><div class="deck-bpm">—</div></div>
+  <div class="deck-card" id="deck-3"><div class="deck-label">DECK 3</div><div class="deck-state">—</div><div class="deck-bpm">—</div></div>
+  <div class="deck-card" id="deck-4"><div class="deck-label">DECK 4</div><div class="deck-state">—</div><div class="deck-bpm">—</div></div>
+</div>
+
+<!-- SHOW CONTROLS -->
+<div class="panel">
+  <div class="panel-title">Light Show</div>
+  <div class="show-grid" id="show-grid">
+    <button class="show-btn" data-show="beat_strobe">Beat Strobe</button>
+    <button class="show-btn" data-show="color_cycle">Color Cycle</button>
+    <button class="show-btn" data-show="pulse">Pulse</button>
+    <button class="show-btn" data-show="chase">Chase</button>
+    <button class="show-btn" data-show="fire">Fire</button>
+    <button class="show-btn" data-show="rainbow">Rainbow</button>
+    <button class="show-btn" data-show="thunderstorm">Thunderstorm</button>
+  </div>
+
+  <div class="brightness-row">
+    <label>Brightness</label>
+    <input type="range" id="brightness-slider" min="0" max="100" value="100">
+    <span class="brightness-val" id="brightness-val">100%</span>
+  </div>
+</div>
+
+<!-- CONFIG ACCORDION -->
+<div class="panel">
+  <div class="accordion-header" id="config-header">
+    <div class="panel-title" style="margin:0">Settings &amp; Configuration</div>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="accordion-body" id="config-body">
+
+    <!-- Art-Net -->
+    <div class="form-section">
+      <h3>Art-Net (PKnight ARS2048B)</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Controller IP</label>
+          <input type="text" id="cfg-artnet-host" placeholder="2.0.0.1">
+        </div>
+        <div class="form-group" style="max-width:100px">
+          <label>Universe</label>
+          <input type="number" id="cfg-artnet-universe" min="0" max="32767">
+        </div>
+        <div class="form-group" style="max-width:100px">
+          <label>Port</label>
+          <input type="number" id="cfg-artnet-port" value="6454">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary btn-sm" id="discover-btn">🔍 Scan for Art-Net Nodes</button>
+      </div>
+      <div id="discover-results"></div>
+
+      <div class="info-box" style="margin-top:10px">
+        <strong>Running Freestyler alongside this app?</strong><br>
+        The ARS2048B has 4 independent DMX ports. Set this app to <strong>Universe 0 → Port 1</strong>
+        and Freestyler to <strong>Universe 1 → Port 2</strong>. Both apps send to the same node
+        simultaneously with zero conflict — plug each set of lights into the matching port.
+      </div>
+    </div>
+
+    <!-- Fixtures -->
+    <div class="form-section">
+      <h3>Fixtures (Chauvet SlimPAR 56 — 7ch mode)</h3>
+      <table class="fixture-table">
+        <thead><tr><th>#</th><th>Name</th><th>DMX Start</th><th></th></tr></thead>
+        <tbody id="fixture-tbody"></tbody>
+      </table>
+      <button class="btn btn-secondary btn-sm" id="add-fixture-btn">+ Add Fixture</button>
+      <div style="margin-top:6px;font-size:.78rem;color:var(--muted)">
+        7ch spacing: set fixtures at 1, 8, 15, 22… Match these addresses on each fixture's dip switches.
+      </div>
+    </div>
+
+    <!-- Opus Quad -->
+    <div class="form-section">
+      <h3>Pioneer Opus Quad (DJ Link)</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Local IP (leave blank to auto-detect)</label>
+          <input type="text" id="cfg-opus-ip" placeholder="auto">
+        </div>
+        <div class="form-group" style="max-width:110px">
+          <label>Beat Port</label>
+          <input type="number" id="cfg-opus-beat">
+        </div>
+        <div class="form-group" style="max-width:110px">
+          <label>Status Port</label>
+          <input type="number" id="cfg-opus-status">
+        </div>
+      </div>
+    </div>
+
+    <!-- Show defaults -->
+    <div class="form-section">
+      <h3>Show Defaults</h3>
+      <div class="form-row">
+        <div class="form-group" style="max-width:150px">
+          <label>Fallback BPM</label>
+          <input type="number" id="cfg-fallback-bpm" min="40" max="240" step="0.5">
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="save-config-btn">💾 Save Configuration</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// -------------------------------------------------------------------------
+// SSE — live status updates
+// -------------------------------------------------------------------------
+const es = new EventSource('/events');
+es.onmessage = e => applyStatus(JSON.parse(e.data));
+es.onerror   = () => setConnState('error');
+
+let activePip = 0;
+
+function applyStatus(s) {
+  // Connection dot
+  const dot   = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-label');
+  dot.className = 'dot';
+  if (s.connected && !s.using_fallback) {
+    dot.classList.add('connected');
+    label.textContent = 'Opus Quad connected';
+  } else if (s.connected && s.using_fallback) {
+    dot.classList.add('fallback');
+    label.textContent = 'Using fallback BPM';
+  } else {
+    dot.classList.add('disconnected');
+    label.textContent = 'No DJ Link signal';
+  }
+
+  // BPM
+  document.getElementById('bpm-display').textContent = s.bpm > 0 ? s.bpm.toFixed(1) : '—';
+
+  // Beat pips
+  if (s.beat_number !== activePip) {
+    activePip = s.beat_number;
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById('pip-' + i).classList.toggle('active', i === activePip);
+    }
+  }
+
+  // Idle badge
+  document.getElementById('idle-badge').classList.toggle('visible', s.is_idle);
+
+  // Deck cards
+  for (let d = 1; d <= 4; d++) {
+    const info = s.decks[String(d)];
+    const card  = document.getElementById('deck-' + d);
+    const state = card.querySelector('.deck-state');
+    const bpm   = card.querySelector('.deck-bpm');
+    if (!info.seen) {
+      card.className = 'deck-card';
+      state.textContent = '—';
+      bpm.textContent   = '—';
+    } else if (info.playing) {
+      card.className = 'deck-card playing';
+      state.textContent = '▶';
+      bpm.textContent   = info.bpm ? info.bpm.toFixed(1) + ' bpm' : '—';
+    } else {
+      card.className = 'deck-card';
+      state.textContent = '⏸';
+      bpm.textContent   = '—';
+    }
+  }
+
+  // Active show highlight
+  document.querySelectorAll('.show-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.show === s.show_name);
+  });
+
+  // Brightness slider (only update if user isn't dragging)
+  if (!sliderDragging) {
+    const pct = Math.round(s.brightness * 100);
+    document.getElementById('brightness-slider').value = pct;
+    document.getElementById('brightness-val').textContent = pct + '%';
+  }
+}
+
+function setConnState(st) {
+  document.getElementById('conn-dot').className = 'dot disconnected';
+  document.getElementById('conn-label').textContent = 'Connection error — retrying…';
+}
+
+// -------------------------------------------------------------------------
+// Show buttons
+// -------------------------------------------------------------------------
+document.getElementById('show-grid').addEventListener('click', e => {
+  const btn = e.target.closest('.show-btn');
+  if (!btn) return;
+  fetch('/api/show', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name: btn.dataset.show})
+  }).then(r => r.json()).then(() => toast('Show: ' + btn.textContent))
+    .catch(() => toast('Error switching show', true));
+});
+
+// -------------------------------------------------------------------------
+// Brightness slider
+// -------------------------------------------------------------------------
+let sliderDragging = false;
+let brightnessTimer = null;
+const slider = document.getElementById('brightness-slider');
+
+slider.addEventListener('mousedown', () => sliderDragging = true);
+slider.addEventListener('touchstart', () => sliderDragging = true);
+slider.addEventListener('mouseup',   () => sliderDragging = false);
+slider.addEventListener('touchend',  () => sliderDragging = false);
+
+slider.addEventListener('input', () => {
+  const val = slider.value;
+  document.getElementById('brightness-val').textContent = val + '%';
+  clearTimeout(brightnessTimer);
+  brightnessTimer = setTimeout(() => {
+    fetch('/api/brightness', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value: val / 100})
+    });
+  }, 200);
+});
+
+// -------------------------------------------------------------------------
+// Config accordion
+// -------------------------------------------------------------------------
+document.getElementById('config-header').addEventListener('click', function() {
+  this.classList.toggle('open');
+  document.getElementById('config-body').classList.toggle('open');
+  if (document.getElementById('config-body').classList.contains('open')) {
+    loadConfig();
+  }
+});
+
+let configData = null;
+
+async function loadConfig() {
+  const r = await fetch('/api/config');
+  configData = await r.json();
+  populateForm(configData);
+}
+
+function populateForm(cfg) {
+  document.getElementById('cfg-artnet-host').value    = cfg.artnet?.host    ?? '2.0.0.1';
+  document.getElementById('cfg-artnet-universe').value= cfg.artnet?.universe ?? 0;
+  document.getElementById('cfg-artnet-port').value    = cfg.artnet?.port     ?? 6454;
+  document.getElementById('cfg-opus-ip').value        = cfg.opus_quad?.local_ip    ?? '';
+  document.getElementById('cfg-opus-beat').value      = cfg.opus_quad?.beat_port   ?? 50001;
+  document.getElementById('cfg-opus-status').value    = cfg.opus_quad?.status_port ?? 50002;
+  document.getElementById('cfg-fallback-bpm').value   = cfg.show?.fallback_bpm ?? 128;
+  buildFixtureTable(cfg.fixtures ?? []);
+}
+
+// ---- Fixture table ----
+function buildFixtureTable(fixtures) {
+  const tbody = document.getElementById('fixture-tbody');
+  tbody.innerHTML = '';
+  fixtures.forEach((f, i) => addFixtureRow(i + 1, f.name, f.dmx_start));
+}
+
+function addFixtureRow(num, name, dmx) {
+  const tbody = document.getElementById('fixture-tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td style="color:var(--muted);padding:4px 8px;font-size:.8rem">${tbody.children.length + 1}</td>
+    <td><input type="text" placeholder="Par ${num}" value="${name ?? ''}"></td>
+    <td><input type="number" min="1" max="512" value="${dmx ?? ''}"></td>
+    <td><button class="btn-icon" title="Remove">✕</button></td>
+  `;
+  tr.querySelector('.btn-icon').addEventListener('click', () => {
+    tr.remove();
+    renumberRows();
+  });
+  tbody.appendChild(tr);
+}
+
+function renumberRows() {
+  document.querySelectorAll('#fixture-tbody tr').forEach((tr, i) => {
+    tr.querySelector('td:first-child').textContent = i + 1;
+  });
+}
+
+document.getElementById('add-fixture-btn').addEventListener('click', () => {
+  const rows = document.querySelectorAll('#fixture-tbody tr');
+  const lastDmx = rows.length > 0
+    ? parseInt(rows[rows.length - 1].querySelector('input[type=number]').value) + 7
+    : 1;
+  addFixtureRow(rows.length + 1, '', lastDmx);
+});
+
+// ---- Gather form data ----
+function collectConfig() {
+  const fixtures = [];
+  document.querySelectorAll('#fixture-tbody tr').forEach(tr => {
+    const inputs = tr.querySelectorAll('input');
+    fixtures.push({name: inputs[0].value, dmx_start: parseInt(inputs[1].value)});
+  });
+  return {
+    artnet: {
+      host:     document.getElementById('cfg-artnet-host').value,
+      universe: parseInt(document.getElementById('cfg-artnet-universe').value),
+      port:     parseInt(document.getElementById('cfg-artnet-port').value),
+    },
+    fixtures,
+    opus_quad: {
+      local_ip:      document.getElementById('cfg-opus-ip').value,
+      beat_port:     parseInt(document.getElementById('cfg-opus-beat').value),
+      status_port:   parseInt(document.getElementById('cfg-opus-status').value),
+      announce_port: 50000,
+    },
+    show: {
+      fallback_bpm: parseFloat(document.getElementById('cfg-fallback-bpm').value),
+      active_show: configData?.show?.active_show ?? 'beat_strobe',
+      brightness:  configData?.show?.brightness  ?? 1.0,
+      transition:  configData?.show?.transition  ?? 0.3,
+    }
+  };
+}
+
+document.getElementById('save-config-btn').addEventListener('click', async () => {
+  const cfg = collectConfig();
+  try {
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(cfg)
+    });
+    configData = cfg;
+    toast('Configuration saved & applied');
+  } catch {
+    toast('Failed to save config', true);
+  }
+});
+
+// -------------------------------------------------------------------------
+// Art-Net discovery
+// -------------------------------------------------------------------------
+document.getElementById('discover-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('discover-btn');
+  const results = document.getElementById('discover-results');
+  btn.textContent = '🔍 Scanning (3s)…';
+  btn.disabled = true;
+  results.innerHTML = '';
+  try {
+    const r = await fetch('/api/discover', {method: 'POST'});
+    const data = await r.json();
+    if (!data.nodes.length) {
+      results.innerHTML = '<div style="color:var(--muted);font-size:.82rem;margin-top:6px">No nodes found. Check network/IP.</div>';
+    } else {
+      data.nodes.forEach(n => {
+        const row = document.createElement('div');
+        row.className = 'node-row';
+        row.innerHTML = `
+          <div class="node-info">
+            <span class="node-ip">${n.sender ?? n.ip}</span>
+            &nbsp;—&nbsp;${n.short_name || 'Unknown'}
+            <span style="color:var(--muted);font-size:.78rem"> (${n.num_ports} ports)</span>
+          </div>
+          <button class="btn btn-secondary btn-sm use-ip-btn">Use this IP</button>
+        `;
+        row.querySelector('.use-ip-btn').addEventListener('click', () => {
+          document.getElementById('cfg-artnet-host').value = n.sender ?? n.ip;
+          toast('IP set to ' + (n.sender ?? n.ip));
+        });
+        results.appendChild(row);
+      });
+    }
+  } catch {
+    results.innerHTML = '<div style="color:var(--red);font-size:.82rem;margin-top:6px">Discovery failed.</div>';
+  }
+  btn.textContent = '🔍 Scan for Art-Net Nodes';
+  btn.disabled = false;
+});
+
+// -------------------------------------------------------------------------
+// Toast helper
+// -------------------------------------------------------------------------
+let toastTimer;
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 2500);
+}
+</script>
+</body>
+</html>
