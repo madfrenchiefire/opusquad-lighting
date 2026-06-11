@@ -3,78 +3,116 @@
 # ---------------------------------------------------------------------------
 # PKnight Easynode ARS2048B — Art-Net/sACN/RDM Controller
 # ---------------------------------------------------------------------------
-# The ARS2048B has 4 DMX output ports. Each port maps to one Art-Net universe:
-#   Port 1  →  Universe 0   (DMX addresses 1-512)
-#   Port 2  →  Universe 1   (DMX addresses 1-512 on that port)
-#   Port 3  →  Universe 2
-#   Port 4  →  Universe 3
+# Port-to-universe mapping:
+#   Port 1  →  Universe 0   ← this app's beat-synced show output
+#   Port 2  →  Universe 1   ← Freestyler (run alongside, no conflict)
+#   Port 3  →  Universe 2   ← optional DMX input from physical controller
+#   Port 4  →  Universe 3   ← spare
 #
-# Connect all 4 SlimPAR 56s to Port 1 (they share the same DMX run).
-#
-# Finding the device IP:
-#   Option A — Static Art-Net IP: The ARS2048B defaults to 2.0.0.1 with
-#              subnet 255.0.0.0. Set your PC's ethernet adapter to 2.x.x.x /8
-#              on the same interface, then ping 2.0.0.1.
-#   Option B — DHCP: If you set the node to DHCP mode via its web UI,
-#              check your router's device list for "ARS2048" or run:
-#                python discover.py
-#              to find it automatically via ArtPoll.
-#   Option C — Broadcast: Set host to "2.255.255.255" (Art-Net broadcast)
-#              to reach the node without knowing its exact IP. Slightly
-#              chattier but works fine on a home network.
+# Finding the node IP: run  python discover.py
+# Factory default: 2.0.0.1 / 255.0.0.0  (set your PC's NIC to 2.0.0.2/8)
 
 artnet:
-  host: "2.0.0.1"     # change to your node's IP, or use "2.255.255.255" to broadcast
-  port: 6454           # standard Art-Net UDP port — do not change
-  universe: 0          # Port 1 on the ARS2048B = universe 0
+  host: "2.0.0.1"     # node IP — use "2.255.255.255" to broadcast
+  port: 6454
+  universe: 0          # Port 1 on the ARS2048B
 
-# DMX start addresses for each SlimPAR 56 fixture (1-based, as set on the light).
-# In 7-channel mode each fixture occupies 7 addresses, so space them 8 apart
-# to leave a 1-address gap (common practice to avoid overlap confusion).
-# Addresses: 1, 8, 15, 22  — set these on each fixture's dip switches.
+# sACN (E1.31) — enable as an alternative or supplement to Art-Net
+sacn:
+  enabled: false
+  universe: 1          # sACN universes are 1-based; 1 = same physical port as Art-Net universe 0
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+# profile: use a built-in name (chauvet_slimpar56_7ch, generic_rgb_3ch, ...)
+#          or a path to an OFL JSON file.
+# group: assign fixtures to groups for independent show assignment.
+# In 7ch mode each fixture uses 7 addresses — space dmx_start 8 apart.
 fixtures:
   - name: "Par 1"
+    profile: "chauvet_slimpar56_7ch"
     dmx_start: 1
+    universe: 0
+    group: "main"
   - name: "Par 2"
+    profile: "chauvet_slimpar56_7ch"
     dmx_start: 8
+    universe: 0
+    group: "main"
   - name: "Par 3"
+    profile: "chauvet_slimpar56_7ch"
     dmx_start: 15
+    universe: 0
+    group: "main"
   - name: "Par 4"
+    profile: "chauvet_slimpar56_7ch"
     dmx_start: 22
+    universe: 0
+    group: "main"
 
-# Pioneer Opus Quad network settings
+# ---------------------------------------------------------------------------
+# Pioneer Opus Quad (Pro DJ Link)
+# ---------------------------------------------------------------------------
 opus_quad:
-  # The Opus Quad broadcasts Pro DJ Link packets on your LAN.
-  # Set this to your machine's IP on the same subnet as the Opus Quad.
-  # Leave as "" to auto-detect.
-  local_ip: ""
-  # DJ Link beat/status packets arrive on these ports
+  local_ip: ""          # leave blank to auto-detect
   beat_port: 50001
   status_port: 50002
   announce_port: 50000
 
 # ---------------------------------------------------------------------------
-# Physical DMX controller input (optional)
+# Audio analysis (Behringer XR-18 via ASIO)
 # ---------------------------------------------------------------------------
-# The ARS2048B can receive DMX from a physical controller on Port 3 or 4
-# and re-broadcast it as Art-Net. Set the port direction to "Input" in the
-# node's web UI, set input_universe to match, then enable below.
-#
-# Default channel mapping (see src/artnet_receiver.py to customise):
-#   Ch 1 → master brightness fader
-#   Ch 2 → show selector (fader sweeps through all 7 shows)
-dmx_input:
+# Run  python -c "from src.audio_analyzer import list_audio_devices; [print(d) for d in list_audio_devices()]"
+# to list available devices and find your XR-18's index.
+audio:
   enabled: false
-  universe: 2          # must match the universe set on the ARS2048B input port
+  device_index: null    # set to the integer index of your ASIO/XR-18 device
+  channels: 2           # how many input channels to capture (2 = stereo main mix)
+  samplerate: 48000
+  blocksize: 1024
+  input_channel: 0      # which captured channel to analyze (0-based)
 
 # ---------------------------------------------------------------------------
-# Light show settings
+# MIDI controller input
+# ---------------------------------------------------------------------------
+midi:
+  enabled: false
+  port_name: null       # null = first available port; run discover to see options
+
+# ---------------------------------------------------------------------------
+# OSC server (TouchOSC, Lemur, etc.)
+# ---------------------------------------------------------------------------
+osc:
+  enabled: false
+  host: "0.0.0.0"
+  port: 8000
+
+# ---------------------------------------------------------------------------
+# Physical DMX controller input via ARS2048B Port 3
+# ---------------------------------------------------------------------------
+dmx_input:
+  enabled: false
+  universe: 2
+
+# ---------------------------------------------------------------------------
+# Show settings
+# ---------------------------------------------------------------------------
 show:
-  # BPM to use when no Opus Quad signal is detected
   fallback_bpm: 128.0
-  # Active show: "beat_strobe", "color_cycle", "pulse", "fire", "chase", "rainbow"
   active_show: "beat_strobe"
-  # Overall brightness 0.0-1.0
   brightness: 1.0
-  # Transition speed between colors (0.0=instant, 1.0=slow)
-  transition: 0.3
+  transition_beats: 2.0       # crossfade length in beats when switching shows
+  auto_select_by_bpm: false   # automatically pick show based on BPM range
+  strobe_max_hz: 10.0         # safety cap — no fixture will strobe faster than this
+  blackout: false             # persistent blackout flag
+
+# ---------------------------------------------------------------------------
+# Config profiles directory
+# ---------------------------------------------------------------------------
+profiles_dir: "profiles"
+
+# ---------------------------------------------------------------------------
+# Data directory (scenes DB, track DB)
+# ---------------------------------------------------------------------------
+data_dir: "data"

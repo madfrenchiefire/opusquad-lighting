@@ -19,9 +19,10 @@ from .fixture import SlimPar56, RGBA, COLORS, COLOR_WHEEL, lerp_color, hue_to_rg
 class BaseShow(ABC):
     name: str = "base"
 
-    def __init__(self, fixtures: list[SlimPar56], brightness: float = 1.0):
+    def __init__(self, fixtures: list[SlimPar56], brightness: float = 1.0, audio=None):
         self.fixtures = fixtures
         self.brightness = brightness
+        self.audio = audio
         self._elapsed = 0.0
 
     def update(self, dt: float, beat_phase: float, bpm: float, beat_number: int) -> None:
@@ -44,8 +45,8 @@ class BaseShow(ABC):
 class BeatStrobeShow(BaseShow):
     name = "beat_strobe"
 
-    def __init__(self, fixtures, brightness=1.0):
-        super().__init__(fixtures, brightness)
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
         self._color_idx = 0
         self._last_beat_number = -1
         self._current_color = COLOR_WHEEL[0]
@@ -90,8 +91,8 @@ class ColorCycleShow(BaseShow):
 class PulseShow(BaseShow):
     name = "pulse"
 
-    def __init__(self, fixtures, brightness=1.0):
-        super().__init__(fixtures, brightness)
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
         self._hue = 0.0
         self._last_beat_number = -1
 
@@ -115,8 +116,8 @@ class PulseShow(BaseShow):
 class ChaseShow(BaseShow):
     name = "chase"
 
-    def __init__(self, fixtures, brightness=1.0):
-        super().__init__(fixtures, brightness)
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
         self._color_a_idx = 0
         self._color_b_idx = 3
         self._last_beat_number = -1
@@ -142,8 +143,8 @@ class ChaseShow(BaseShow):
 class FireShow(BaseShow):
     name = "fire"
 
-    def __init__(self, fixtures, brightness=1.0):
-        super().__init__(fixtures, brightness)
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
         self._flicker = [random.random() for _ in fixtures]
         self._flicker_speed = [0.5 + random.random() * 2.0 for _ in fixtures]
 
@@ -191,8 +192,8 @@ class RainbowShow(BaseShow):
 class ThunderstormShow(BaseShow):
     name = "thunderstorm"
 
-    def __init__(self, fixtures, brightness=1.0):
-        super().__init__(fixtures, brightness)
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
         self._lightning_fixtures: set[int] = set()
         self._lightning_decay = 0.0
 
@@ -233,11 +234,143 @@ class IdleShow(BaseShow):
     def _render(self, dt, beat_phase, bpm, beat_number):
         # Slow breath: one inhale/exhale every ~4 seconds
         breath = (1.0 + math.sin(self._elapsed * (2 * math.pi / 4.0))) / 2.0
-        level = self.IDLE_LEVEL + breath * 0.10   # 0.25 → 0.35 range
+        level = self.IDLE_LEVEL + breath * 0.10   # 0.25 -> 0.35 range
         for fix in self.fixtures:
             fix.color = COLORS["blue"]
             fix.strobe = 0
             fix.dimmer = round(255 * level * self.brightness)
+
+
+# ---------------------------------------------------------------------------
+# Bass Reactive — punchy kick-driven brightness with slow hue shift
+# ---------------------------------------------------------------------------
+class BassReactiveShow(BaseShow):
+    name = "bass_reactive"
+
+    # How many frames to hold the strobe on after a bass spike
+    _STROBE_FRAMES = 5
+
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
+        self._strobe_frames_left = 0
+
+    def _render(self, dt, beat_phase, bpm, beat_number):
+        audio = self.audio
+
+        # Hue rotates once every 32 bars.  Each bar = 4 beats.
+        # seconds_per_bar = 4 * 60 / bpm
+        # seconds_per_32_bars = 32 * seconds_per_bar
+        bps = bpm / 60.0
+        cycle_seconds = 32.0 * 4.0 / bps if bps > 0 else 128.0
+        hue = (self._elapsed / cycle_seconds) % 1.0
+        base_color = hue_to_rgba(hue)
+
+        # Brightness: directly from bass (instant, no smoothing)
+        if audio is not None:
+            bass = max(0.0, min(1.0, float(audio.bass)))
+        else:
+            # Fallback: beat_phase cosine pulse mimicking a kick shape
+            bass = max(0.0, (1.0 + math.cos(beat_phase * 2 * math.pi)) / 2.0)
+
+        # Strobe on sharp bass spike
+        if audio is not None and audio.bass > 0.85:
+            self._strobe_frames_left = self._STROBE_FRAMES
+
+        strobe_active = self._strobe_frames_left > 0
+        if strobe_active:
+            self._strobe_frames_left -= 1
+
+        for fix in self.fixtures:
+            fix.color = base_color
+            fix.strobe = 255 if strobe_active else 0
+            fix.dimmer = round(bass * 255 * self.brightness)
+
+
+# ---------------------------------------------------------------------------
+# Spectrum — 4 fixtures mapped to frequency bands
+# ---------------------------------------------------------------------------
+class SpectrumShow(BaseShow):
+    name = "spectrum"
+
+    def _render(self, dt, beat_phase, bpm, beat_number):
+        audio = self.audio
+
+        if audio is None:
+            # Fallback: rainbow
+            n = max(len(self.fixtures), 1)
+            bps = bpm / 60.0
+            cycle_phase = (self._elapsed * bps / 16.0) % 1.0
+            for i, fix in enumerate(self.fixtures):
+                hue = (cycle_phase + i / n) % 1.0
+                fix.color = hue_to_rgba(hue)
+                fix.strobe = 0
+            return
+
+        bass   = max(0.0, min(1.0, float(audio.bass)))
+        mid    = max(0.0, min(1.0, float(audio.mid)))
+        # Approximate low-mid / high-mid split from mid
+        low_mid  = max(0.0, min(1.0, mid * 1.2))          # tilt toward low-mid
+        high_mid = max(0.0, min(1.0, mid * 0.8))          # tilt toward high-mid
+        high   = max(0.0, min(1.0, float(audio.high)))
+
+        # Band -> color mapping
+        band_colors = [
+            (RGBA(r=255, g=0,   b=0),   bass),      # 0: deep red  <- bass
+            (RGBA(r=255, g=140, b=0),   low_mid),   # 1: orange    <- low-mid
+            (RGBA(r=0,   g=200, b=0),   high_mid),  # 2: green     <- high-mid
+            (RGBA(r=0,   g=100, b=255), high),      # 3: blue/white <- highs
+        ]
+
+        for i, fix in enumerate(self.fixtures):
+            if i < len(band_colors):
+                color, level = band_colors[i]
+                fix.color = color
+                fix.dimmer = round(level * 255 * self.brightness)
+            else:
+                # Extra fixtures: mirror last band
+                color, level = band_colors[-1]
+                fix.color = color
+                fix.dimmer = round(level * 255 * self.brightness)
+            fix.strobe = 0
+
+
+# ---------------------------------------------------------------------------
+# Energy Pulse — audio.energy-driven pulse, smoothed
+# ---------------------------------------------------------------------------
+class EnergyPulseShow(BaseShow):
+    name = "energy_pulse"
+
+    _SMOOTH_ALPHA = 0.4   # exponential smoothing: higher = more responsive
+
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
+        self._hue = 0.0
+        self._last_beat_number = -1
+        self._smoothed_energy = 0.0
+
+    def _render(self, dt, beat_phase, bpm, beat_number):
+        # Color cycles every 8 bars
+        bps = bpm / 60.0
+        cycle_seconds = 8.0 * 4.0 / bps if bps > 0 else 32.0
+        hue = (self._elapsed / cycle_seconds) % 1.0
+        color = hue_to_rgba(hue)
+
+        # Energy source
+        if self.audio is not None:
+            raw_energy = max(0.0, min(1.0, float(self.audio.energy)))
+        else:
+            # Fallback: beat_phase sine wave (same as PulseShow)
+            raw_energy = (1.0 + math.cos(beat_phase * 2 * math.pi)) / 2.0
+
+        # Exponential smoothing
+        alpha = self._SMOOTH_ALPHA
+        self._smoothed_energy = alpha * raw_energy + (1.0 - alpha) * self._smoothed_energy
+
+        dim = round(self._smoothed_energy * 255 * self.brightness)
+        for fix in self.fixtures:
+            fix.color = color
+            fix.strobe = 0
+            fix.dimmer = dim
 
 
 # ---------------------------------------------------------------------------
@@ -249,12 +382,18 @@ ALL_SHOWS: dict[str, type[BaseShow]] = {
         BeatStrobeShow, ColorCycleShow, PulseShow,
         ChaseShow, FireShow, RainbowShow, ThunderstormShow,
         IdleShow,
+        BassReactiveShow, SpectrumShow, EnergyPulseShow,
     ]
 }
 
 
-def get_show(name: str, fixtures: list[SlimPar56], brightness: float = 1.0) -> BaseShow:
+def get_show(
+    name: str,
+    fixtures: list[SlimPar56],
+    brightness: float = 1.0,
+    **kwargs,
+) -> BaseShow:
     cls = ALL_SHOWS.get(name)
     if cls is None:
         raise ValueError(f"Unknown show '{name}'. Available: {list(ALL_SHOWS)}")
-    return cls(fixtures, brightness)
+    return cls(fixtures, brightness, **kwargs)

@@ -2,653 +2,982 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>OpusQuad Lighting</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0b0f;--panel:#16161f;--panel2:#1e1e2a;--border:#2a2a3a;
+  --accent:#7c3aed;--accent2:#06b6d4;--green:#22c55e;--red:#ef4444;
+  --yellow:#eab308;--orange:#f97316;--text:#e2e8f0;--muted:#64748b;
+  --r:10px;
+}
+html{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+  min-height:100%;padding:12px;max-width:1200px;margin:0 auto}
 
-  :root {
-    --bg:      #0f0f13;
-    --panel:   #1a1a22;
-    --border:  #2e2e3e;
-    --accent:  #7c3aed;
-    --accent2: #06b6d4;
-    --green:   #22c55e;
-    --red:     #ef4444;
-    --yellow:  #eab308;
-    --text:    #e2e8f0;
-    --muted:   #64748b;
-    --radius:  10px;
-  }
+/* ── GRID LAYOUT ── */
+.app-grid{display:grid;gap:12px;
+  grid-template-areas:
+    "header header"
+    "decks  decks"
+    "shows  controls"
+    "viz    viz"
+    "scenes scenes"
+    "tracks tracks"
+    "config config";
+  grid-template-columns:1fr 1fr;
+}
+@media(max-width:700px){
+  .app-grid{grid-template-areas:"header""decks""shows""controls""viz""scenes""tracks""config";
+    grid-template-columns:1fr}
+}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
-    padding: 16px;
-  }
+/* ── PANELS ── */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.panel-title{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:1.2px;margin-bottom:12px}
 
-  /* ---- HEADER ---- */
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 16px;
-  }
-  .header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: .5px; }
-  .dot {
-    width: 12px; height: 12px; border-radius: 50%;
-    background: var(--muted); flex-shrink: 0;
-    transition: background .4s;
-  }
-  .dot.connected    { background: var(--green); box-shadow: 0 0 8px var(--green); }
-  .dot.disconnected { background: var(--red); }
-  .dot.fallback     { background: var(--yellow); }
-  .bpm-display {
-    font-size: 2.2rem; font-weight: 800; font-variant-numeric: tabular-nums;
-    letter-spacing: -1px; color: var(--accent2); margin-left: auto;
-  }
-  .bpm-label { font-size: .7rem; color: var(--muted); text-align: right; }
-  .beats { display: flex; gap: 5px; margin-left: 8px; }
-  .beat-pip {
-    width: 10px; height: 10px; border-radius: 3px;
-    background: var(--border); transition: background .05s;
-  }
-  .beat-pip.active { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-  .idle-badge {
-    display: none;
-    background: #1e3a5f; color: var(--accent2);
-    border: 1px solid var(--accent2);
-    padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 600;
-  }
-  .idle-badge.visible { display: block; }
+/* ── HEADER ── */
+.header{grid-area:header;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.header h1{font-size:1.1rem;font-weight:800;letter-spacing:.3px;white-space:nowrap}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .4s}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.warn{background:var(--yellow)}
+.dot.off{background:var(--red)}
+.conn-label{font-size:.75rem;color:var(--muted)}
+.bpm-block{margin-left:auto;text-align:right}
+.bpm-num{font-size:2.4rem;font-weight:900;font-variant-numeric:tabular-nums;
+  letter-spacing:-2px;color:var(--accent2);line-height:1}
+.bpm-sub{font-size:.68rem;color:var(--muted)}
+.beats{display:flex;gap:4px;align-items:center}
+.pip{width:9px;height:9px;border-radius:2px;background:var(--border);transition:background .05s}
+.pip.on{background:var(--accent);box-shadow:0 0 5px var(--accent)}
+.badge{padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:700;border:1px solid}
+.badge-idle{background:#1a3354;color:var(--accent2);border-color:var(--accent2);display:none}
+.badge-idle.show{display:inline-block}
+.badge-bo{background:#3b1212;color:var(--red);border-color:var(--red);display:none}
+.badge-bo.show{display:inline-block}
 
-  /* ---- DECKS ---- */
-  .decks {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-  @media (max-width: 600px) { .decks { grid-template-columns: repeat(2, 1fr); } }
-  .deck-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    text-align: center;
-    transition: border-color .3s;
-  }
-  .deck-card.playing { border-color: var(--green); }
-  .deck-label { font-size: .7rem; color: var(--muted); margin-bottom: 4px; }
-  .deck-state { font-size: 1.1rem; margin-bottom: 4px; }
-  .deck-bpm { font-size: .85rem; color: var(--accent2); font-variant-numeric: tabular-nums; }
+/* ── DECK CARDS ── */
+.decks{grid-area:decks;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(max-width:500px){.decks{grid-template-columns:repeat(2,1fr)}}
+.deck{background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+  padding:10px;text-align:center;transition:border-color .3s}
+.deck.playing{border-color:var(--green)}
+.deck-lbl{font-size:.65rem;color:var(--muted);margin-bottom:3px}
+.deck-icon{font-size:1.2rem;line-height:1;margin-bottom:2px}
+.deck-bpm{font-size:.8rem;color:var(--accent2);font-variant-numeric:tabular-nums}
 
-  /* ---- CONTROLS ---- */
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px;
-    margin-bottom: 16px;
-  }
-  .panel-title {
-    font-size: .8rem; font-weight: 600; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 1px;
-    margin-bottom: 14px;
-  }
+/* ── SHOW GRID ── */
+.shows{grid-area:shows}
+.show-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:7px}
+.show-btn{background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:9px 6px;border-radius:7px;cursor:pointer;font-size:.8rem;font-weight:600;
+  transition:all .15s;text-align:center;width:100%;position:relative}
+.show-btn:hover{border-color:var(--accent);color:var(--accent)}
+.show-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;
+  box-shadow:0 0 14px rgba(124,58,237,.45)}
+.show-btn .audio-dot{position:absolute;top:4px;right:5px;width:5px;height:5px;
+  border-radius:50%;background:var(--accent2);opacity:0}
+.show-btn.audio-show .audio-dot{opacity:1}
+.show-nav{display:flex;gap:6px;margin-top:8px}
 
-  .show-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 8px;
-  }
-  .show-btn {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 10px 8px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: .85rem;
-    font-weight: 500;
-    transition: all .15s;
-    text-align: center;
-  }
-  .show-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .show-btn.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-    box-shadow: 0 0 12px rgba(124,58,237,.4);
-  }
+/* ── CONTROLS ── */
+.controls{grid-area:controls;display:flex;flex-direction:column;gap:10px}
+.ctrl-row{display:flex;align-items:center;gap:10px}
+.ctrl-lbl{font-size:.78rem;color:var(--muted);min-width:78px}
+input[type=range]{flex:1;-webkit-appearance:none;height:5px;background:var(--border);
+  border-radius:3px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--accent);cursor:pointer}
+.ctrl-val{min-width:36px;text-align:right;font-variant-numeric:tabular-nums;font-size:.82rem}
+.btn{padding:8px 14px;border-radius:7px;font-size:.82rem;font-weight:700;
+  cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#6d28d9}
+.btn-danger{background:#7f1d1d;color:#fca5a5;border:1px solid var(--red)}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn-danger.active{background:var(--red);color:#fff;box-shadow:0 0 12px rgba(239,68,68,.5)}
+.btn-sec{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn-sec:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:5px 10px;font-size:.75rem}
+.big-btns{display:flex;gap:8px;flex-wrap:wrap}
 
-  /* brightness */
-  .brightness-row { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
-  .brightness-row label { font-size: .85rem; color: var(--muted); min-width: 80px; }
-  input[type=range] {
-    flex: 1; -webkit-appearance: none; height: 6px;
-    background: var(--border); border-radius: 3px; outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 18px; height: 18px;
-    border-radius: 50%; background: var(--accent); cursor: pointer;
-  }
-  .brightness-val { min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+/* ── AUDIO VIZ ── */
+.viz{grid-area:viz}
+.viz-inner{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;align-items:end}
+.band{display:flex;flex-direction:column;align-items:center;gap:5px}
+.band-bar-wrap{width:100%;height:60px;background:var(--bg);border-radius:5px;
+  overflow:hidden;display:flex;align-items:flex-end}
+.band-bar{width:100%;height:0%;border-radius:4px 4px 0 0;transition:height .05s}
+.band-bass .band-bar{background:#ef4444}
+.band-mid .band-bar{background:#f97316}
+.band-high .band-bar{background:#22c55e}
+.band-energy .band-bar{background:var(--accent)}
+.band-lbl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.band-val{font-size:.7rem;font-variant-numeric:tabular-nums;color:var(--text)}
+.no-audio-msg{font-size:.8rem;color:var(--muted);padding:8px 0}
 
-  /* ---- CONFIG ACCORDION ---- */
-  .accordion-header {
-    display: flex; align-items: center; justify-content: space-between;
-    cursor: pointer; user-select: none;
-  }
-  .accordion-header .chevron { transition: transform .2s; }
-  .accordion-header.open .chevron { transform: rotate(180deg); }
-  .accordion-body { display: none; padding-top: 16px; }
-  .accordion-body.open { display: block; }
+/* ── SCENES ── */
+.scenes{grid-area:scenes}
+.scene-list{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;min-height:34px}
+.scene-chip{display:flex;align-items:center;gap:5px;background:var(--panel2);
+  border:1px solid var(--border);border-radius:20px;padding:4px 10px 4px 12px;
+  font-size:.78rem;cursor:default}
+.scene-chip.active{border-color:var(--accent2);color:var(--accent2)}
+.scene-play{background:none;border:none;cursor:pointer;color:inherit;font-size:.9rem;padding:0}
+.scene-play:hover{color:var(--green)}
+.scene-del{background:none;border:none;cursor:pointer;color:var(--muted);font-size:.8rem;padding:0 2px}
+.scene-del:hover{color:var(--red)}
+.scene-capture-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.scene-capture-row input{background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:6px 10px;border-radius:6px;font-size:.82rem;flex:1;min-width:120px;outline:none}
+.scene-capture-row input:focus{border-color:var(--accent)}
 
-  .form-section { margin-bottom: 20px; }
-  .form-section h3 { font-size: .8rem; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .8px; }
-  .form-row { display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
-  .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
-  .form-group label { font-size: .78rem; color: var(--muted); }
-  .form-group input {
-    background: var(--bg); border: 1px solid var(--border);
-    color: var(--text); padding: 7px 10px; border-radius: 6px;
-    font-size: .9rem; outline: none; transition: border-color .15s;
-  }
-  .form-group input:focus { border-color: var(--accent); }
+/* ── TRACKS ── */
+.tracks{grid-area:tracks}
+.track-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.track-table th{color:var(--muted);text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);font-size:.72rem}
+.track-table td{padding:5px 8px;border-bottom:1px solid #1a1a24}
+.track-table tr:hover td{background:var(--panel2)}
 
-  /* fixture table */
-  .fixture-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-  .fixture-table th {
-    font-size: .75rem; color: var(--muted); text-align: left;
-    padding: 6px 8px; border-bottom: 1px solid var(--border);
-  }
-  .fixture-table td { padding: 5px 4px; }
-  .fixture-table input {
-    background: var(--bg); border: 1px solid var(--border);
-    color: var(--text); padding: 5px 8px; border-radius: 5px;
-    font-size: .85rem; width: 100%; outline: none;
-  }
-  .fixture-table input:focus { border-color: var(--accent); }
-  .btn-icon {
-    background: none; border: none; cursor: pointer; color: var(--red);
-    font-size: 1.1rem; padding: 4px;
-  }
-  .btn-icon:hover { color: #f87171; }
+/* ── CONFIG ACCORDION ── */
+.config{grid-area:config}
+.acc-hdr{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+.acc-hdr .chev{transition:transform .2s;color:var(--muted)}
+.acc-hdr.open .chev{transform:rotate(180deg)}
+.acc-body{display:none;padding-top:14px}
+.acc-body.open{display:block}
 
-  /* buttons */
-  .btn {
-    padding: 8px 16px; border-radius: 7px; font-size: .85rem;
-    font-weight: 600; cursor: pointer; border: none; transition: all .15s;
-  }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: #6d28d9; }
-  .btn-secondary {
-    background: var(--bg); color: var(--text);
-    border: 1px solid var(--border);
-  }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-sm { padding: 5px 10px; font-size: .8rem; }
+.tabs{display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0}
+.tab{background:none;border:none;color:var(--muted);font-size:.8rem;font-weight:600;
+  cursor:pointer;padding:7px 14px;border-radius:6px 6px 0 0;transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-bottom-color:var(--panel2)}
+.tab-pane{display:none}.tab-pane.active{display:block}
 
-  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.form-sec{margin-bottom:18px}
+.form-sec h3{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:9px}
+.form-row{display:flex;gap:9px;margin-bottom:7px;flex-wrap:wrap}
+.fg{display:flex;flex-direction:column;gap:3px;flex:1;min-width:140px}
+.fg label{font-size:.72rem;color:var(--muted)}
+.fg input,.fg select{background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:6px 9px;border-radius:6px;font-size:.85rem;outline:none;transition:border-color .15s}
+.fg input:focus,.fg select:focus{border-color:var(--accent)}
+.fg select option{background:var(--bg)}
+.toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.toggle-row label{font-size:.82rem;cursor:pointer}
+.toggle{width:36px;height:20px;background:var(--border);border-radius:10px;
+  position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;width:14px;height:14px;background:#fff;
+  border-radius:50%;top:3px;left:3px;transition:left .2s}
+.toggle.on::after{left:19px}
 
-  /* discovery results */
-  #discover-results { margin-top: 10px; }
-  .node-row {
-    display: flex; align-items: center; justify-content: space-between;
-    background: var(--bg); border: 1px solid var(--border);
-    border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;
-  }
-  .node-info { font-size: .85rem; }
-  .node-ip { color: var(--accent2); font-weight: 600; }
+.fixture-tbl{width:100%;border-collapse:collapse;margin-bottom:8px}
+.fixture-tbl th{font-size:.7rem;color:var(--muted);text-align:left;padding:5px 6px;border-bottom:1px solid var(--border)}
+.fixture-tbl td{padding:4px 3px}
+.fixture-tbl input,.fixture-tbl select{background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:4px 7px;border-radius:5px;font-size:.8rem;width:100%;outline:none}
+.fixture-tbl input:focus,.fixture-tbl select:focus{border-color:var(--accent)}
+.btn-icon{background:none;border:none;cursor:pointer;color:var(--muted);font-size:1rem;padding:3px}
+.btn-icon:hover{color:var(--red)}
 
-  /* toast */
-  #toast {
-    position: fixed; bottom: 20px; right: 20px;
-    background: var(--green); color: #000;
-    padding: 10px 18px; border-radius: 8px;
-    font-size: .85rem; font-weight: 600;
-    opacity: 0; transition: opacity .3s; pointer-events: none;
-  }
-  #toast.show { opacity: 1; }
-  #toast.error { background: var(--red); color: #fff; }
+.info-box{background:#1a2a1a;border:1px solid #2a4a2a;border-radius:7px;
+  padding:10px 13px;font-size:.78rem;line-height:1.55;color:#a7d9a7;margin-top:8px}
+.info-box strong{color:#6ee7b7}
 
-  /* freestyler note */
-  .info-box {
-    background: #1e2a1e; border: 1px solid #2d4a2d;
-    border-radius: 8px; padding: 12px 14px;
-    font-size: .82rem; line-height: 1.5; color: #a7d9a7;
-    margin-top: 8px;
-  }
-  .info-box strong { color: #6ee7b7; }
+.discover-results{margin-top:8px}
+.node-row{display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:7px 11px;margin-bottom:5px;font-size:.8rem}
+.node-ip{color:var(--accent2);font-weight:700}
+
+.profiles-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.profile-chip{display:flex;align-items:center;gap:4px;background:var(--panel2);
+  border:1px solid var(--border);border-radius:16px;padding:3px 10px;font-size:.75rem}
+.profile-chip button{background:none;border:none;cursor:pointer;color:var(--muted);font-size:.8rem}
+.profile-chip button:hover{color:var(--accent2)}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:18px;right:18px;background:var(--green);color:#000;
+  padding:9px 16px;border-radius:8px;font-size:.82rem;font-weight:700;
+  opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999}
+#toast.show{opacity:1}
+#toast.err{background:var(--red);color:#fff}
+
+/* ── KB SHORTCUT HINT ── */
+.kb-hint{font-size:.65rem;color:var(--border);margin-top:6px;text-align:right}
 </style>
 </head>
 <body>
+<div class="app-grid">
 
-<!-- HEADER -->
-<div class="header">
+<!-- ═══════════════════════════════ HEADER ════════════════════════════════ -->
+<div class="panel header">
   <div class="dot" id="conn-dot"></div>
   <div>
     <h1>OpusQuad Lighting</h1>
-    <div id="conn-label" style="font-size:.75rem;color:var(--muted)">Connecting…</div>
+    <div class="conn-label" id="conn-lbl">Connecting…</div>
   </div>
-  <span class="idle-badge" id="idle-badge">⏸ PAUSED</span>
-  <div style="margin-left:auto;text-align:right">
-    <div class="bpm-display" id="bpm-display">—</div>
-    <div class="bpm-label">BPM</div>
+  <span class="badge badge-idle" id="badge-idle">⏸ ALL PAUSED</span>
+  <span class="badge badge-bo" id="badge-bo">⚫ BLACKOUT</span>
+  <div class="bpm-block">
+    <div class="bpm-num" id="bpm-num">—</div>
+    <div class="bpm-sub">BPM</div>
   </div>
-  <div>
-    <div class="beats" id="beat-pips">
-      <div class="beat-pip" id="pip-1"></div>
-      <div class="beat-pip" id="pip-2"></div>
-      <div class="beat-pip" id="pip-3"></div>
-      <div class="beat-pip" id="pip-4"></div>
-    </div>
+  <div class="beats" id="beat-pips">
+    <div class="pip" id="pip-1"></div>
+    <div class="pip" id="pip-2"></div>
+    <div class="pip" id="pip-3"></div>
+    <div class="pip" id="pip-4"></div>
   </div>
 </div>
 
-<!-- DECK STATUS -->
-<div class="decks" id="decks">
-  <div class="deck-card" id="deck-1"><div class="deck-label">DECK 1</div><div class="deck-state">—</div><div class="deck-bpm">—</div></div>
-  <div class="deck-card" id="deck-2"><div class="deck-label">DECK 2</div><div class="deck-state">—</div><div class="deck-bpm">—</div></div>
-  <div class="deck-card" id="deck-3"><div class="deck-label">DECK 3</div><div class="deck-state">—</div><div class="deck-bpm">—</div></div>
-  <div class="deck-card" id="deck-4"><div class="deck-label">DECK 4</div><div class="deck-state">—</div><div class="deck-bpm">—</div></div>
+<!-- ═══════════════════════════════ DECKS ════════════════════════════════ -->
+<div class="decks">
+  <div class="deck" id="deck-1"><div class="deck-lbl">DECK 1</div><div class="deck-icon">—</div><div class="deck-bpm">—</div></div>
+  <div class="deck" id="deck-2"><div class="deck-lbl">DECK 2</div><div class="deck-icon">—</div><div class="deck-bpm">—</div></div>
+  <div class="deck" id="deck-3"><div class="deck-lbl">DECK 3</div><div class="deck-icon">—</div><div class="deck-bpm">—</div></div>
+  <div class="deck" id="deck-4"><div class="deck-lbl">DECK 4</div><div class="deck-icon">—</div><div class="deck-bpm">—</div></div>
 </div>
 
-<!-- SHOW CONTROLS -->
-<div class="panel">
+<!-- ═══════════════════════════════ SHOWS ════════════════════════════════ -->
+<div class="panel shows">
   <div class="panel-title">Light Show</div>
   <div class="show-grid" id="show-grid">
-    <button class="show-btn" data-show="beat_strobe">Beat Strobe</button>
-    <button class="show-btn" data-show="color_cycle">Color Cycle</button>
-    <button class="show-btn" data-show="pulse">Pulse</button>
-    <button class="show-btn" data-show="chase">Chase</button>
-    <button class="show-btn" data-show="fire">Fire</button>
-    <button class="show-btn" data-show="rainbow">Rainbow</button>
-    <button class="show-btn" data-show="thunderstorm">Thunderstorm</button>
+    <button class="show-btn" data-show="beat_strobe">Beat Strobe<span class="audio-dot"></span></button>
+    <button class="show-btn" data-show="color_cycle">Color Cycle<span class="audio-dot"></span></button>
+    <button class="show-btn" data-show="pulse">Pulse<span class="audio-dot"></span></button>
+    <button class="show-btn" data-show="chase">Chase<span class="audio-dot"></span></button>
+    <button class="show-btn" data-show="fire">Fire<span class="audio-dot"></span></button>
+    <button class="show-btn" data-show="rainbow">Rainbow<span class="audio-dot"></span></button>
+    <button class="show-btn" data-show="thunderstorm">Thunderstorm<span class="audio-dot"></span></button>
+    <button class="show-btn audio-show" data-show="bass_reactive">Bass Reactive<span class="audio-dot"></span></button>
+    <button class="show-btn audio-show" data-show="spectrum">Spectrum<span class="audio-dot"></span></button>
+    <button class="show-btn audio-show" data-show="energy_pulse">Energy Pulse<span class="audio-dot"></span></button>
   </div>
+  <div class="show-nav">
+    <button class="btn btn-sec btn-sm" id="prev-show">◀ Prev</button>
+    <button class="btn btn-sec btn-sm" id="next-show">Next ▶</button>
+  </div>
+  <div class="kb-hint">1-9: shows &nbsp;|&nbsp; ←→: prev/next &nbsp;|&nbsp; Space: blackout &nbsp;|&nbsp; T: tap</div>
+</div>
 
-  <div class="brightness-row">
-    <label>Brightness</label>
-    <input type="range" id="brightness-slider" min="0" max="100" value="100">
-    <span class="brightness-val" id="brightness-val">100%</span>
+<!-- ═══════════════════════════════ CONTROLS ═════════════════════════════ -->
+<div class="panel controls">
+  <div class="panel-title">Controls</div>
+  <div class="big-btns">
+    <button class="btn btn-danger" id="blackout-btn">⚫ BLACKOUT</button>
+    <button class="btn btn-sec" id="tap-btn">🎵 Tap Tempo</button>
+    <div id="tap-bpm" style="font-size:.8rem;color:var(--accent2);align-self:center"></div>
+  </div>
+  <div class="ctrl-row" style="margin-top:10px">
+    <span class="ctrl-lbl">Brightness</span>
+    <input type="range" id="brightness" min="0" max="100" value="100">
+    <span class="ctrl-val" id="bright-val">100%</span>
+  </div>
+  <div class="ctrl-row">
+    <span class="ctrl-lbl">Transition</span>
+    <input type="range" id="transition" min="0" max="80" value="20">
+    <span class="ctrl-val" id="trans-val">2.0 beats</span>
   </div>
 </div>
 
-<!-- CONFIG ACCORDION -->
-<div class="panel">
-  <div class="accordion-header" id="config-header">
+<!-- ═══════════════════════════════ AUDIO VIZ ════════════════════════════ -->
+<div class="panel viz">
+  <div class="panel-title">Audio Analysis — XR-18</div>
+  <div id="viz-content">
+    <div class="no-audio-msg" id="no-audio-msg">Audio analyzer not active. Enable in Settings → Audio.</div>
+    <div class="viz-inner" id="viz-bars" style="display:none">
+      <div class="band band-bass">
+        <div class="band-bar-wrap"><div class="band-bar" id="bar-bass"></div></div>
+        <div class="band-lbl">Bass</div><div class="band-val" id="val-bass">0%</div>
+      </div>
+      <div class="band band-mid">
+        <div class="band-bar-wrap"><div class="band-bar" id="bar-mid"></div></div>
+        <div class="band-lbl">Mid</div><div class="band-val" id="val-mid">0%</div>
+      </div>
+      <div class="band band-high">
+        <div class="band-bar-wrap"><div class="band-bar" id="bar-high"></div></div>
+        <div class="band-lbl">High</div><div class="band-val" id="val-high">0%</div>
+      </div>
+      <div class="band band-energy">
+        <div class="band-bar-wrap"><div class="band-bar" id="bar-energy"></div></div>
+        <div class="band-lbl">Energy</div><div class="band-val" id="val-energy">0%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ SCENES ═══════════════════════════════ -->
+<div class="panel scenes">
+  <div class="panel-title">Scenes / Cues</div>
+  <div class="scene-list" id="scene-list"></div>
+  <div class="scene-capture-row">
+    <input type="text" id="scene-name" placeholder="Scene name…">
+    <input type="number" id="scene-fade" value="0" min="0" max="30" step="0.5" style="max-width:80px" title="Fade time (seconds)">
+    <span style="font-size:.72rem;color:var(--muted)">s fade</span>
+    <button class="btn btn-sec btn-sm" id="capture-btn">📸 Capture</button>
+    <button class="btn btn-sec btn-sm" id="stop-scene-btn">■ Stop Scene</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ TRACKS ═══════════════════════════════ -->
+<div class="panel tracks">
+  <div class="panel-title">Track Library</div>
+  <div id="track-list-wrap" style="overflow-x:auto">
+    <table class="track-table">
+      <thead><tr><th>Track</th><th>Artist</th><th>BPM</th><th>Key</th><th>Show</th><th></th></tr></thead>
+      <tbody id="track-tbody"><tr><td colspan="6" style="color:var(--muted);padding:12px 8px">No tracks yet — they'll appear here as you play on the Opus Quad.</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ CONFIG ═══════════════════════════════ -->
+<div class="panel config">
+  <div class="acc-hdr" id="cfg-hdr">
     <div class="panel-title" style="margin:0">Settings &amp; Configuration</div>
-    <span class="chevron">▼</span>
+    <span class="chev">▼</span>
   </div>
-  <div class="accordion-body" id="config-body">
+  <div class="acc-body" id="cfg-body">
+    <div class="tabs">
+      <button class="tab active" data-tab="artnet">Art-Net</button>
+      <button class="tab" data-tab="fixtures">Fixtures</button>
+      <button class="tab" data-tab="audio-tab">Audio</button>
+      <button class="tab" data-tab="midi-tab">MIDI / OSC</button>
+      <button class="tab" data-tab="opus-tab">Opus Quad</button>
+      <button class="tab" data-tab="show-tab">Show</button>
+      <button class="tab" data-tab="profiles-tab">Profiles</button>
+    </div>
 
-    <!-- Art-Net -->
-    <div class="form-section">
-      <h3>Art-Net (PKnight ARS2048B)</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Controller IP</label>
-          <input type="text" id="cfg-artnet-host" placeholder="2.0.0.1">
+    <!-- ART-NET TAB -->
+    <div class="tab-pane active" id="tab-artnet">
+      <div class="form-sec">
+        <h3>PKnight ARS2048B</h3>
+        <div class="form-row">
+          <div class="fg"><label>Controller IP</label><input type="text" id="c-artnet-host" placeholder="2.0.0.1"></div>
+          <div class="fg" style="max-width:90px"><label>Universe</label><input type="number" id="c-artnet-uni" min="0" max="32767"></div>
+          <div class="fg" style="max-width:90px"><label>Port</label><input type="number" id="c-artnet-port"></div>
         </div>
-        <div class="form-group" style="max-width:100px">
-          <label>Universe</label>
-          <input type="number" id="cfg-artnet-universe" min="0" max="32767">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <button class="btn btn-sec btn-sm" id="discover-btn">🔍 Scan for Nodes</button>
         </div>
-        <div class="form-group" style="max-width:100px">
-          <label>Port</label>
-          <input type="number" id="cfg-artnet-port" value="6454">
+        <div id="discover-results"></div>
+      </div>
+      <div class="form-sec">
+        <h3>sACN (E1.31)</h3>
+        <div class="toggle-row">
+          <div class="toggle" id="t-sacn"></div>
+          <label onclick="toggleClick('t-sacn','c-sacn-en')">Enable sACN output</label>
+          <input type="hidden" id="c-sacn-en" value="false">
+        </div>
+        <div class="form-row">
+          <div class="fg" style="max-width:110px"><label>sACN Universe</label><input type="number" id="c-sacn-uni" min="1" max="63999"></div>
         </div>
       </div>
-      <div class="btn-row">
-        <button class="btn btn-secondary btn-sm" id="discover-btn">🔍 Scan for Art-Net Nodes</button>
-      </div>
-      <div id="discover-results"></div>
-
-      <div class="info-box" style="margin-top:10px">
+      <div class="info-box">
         <strong>Running Freestyler alongside this app?</strong><br>
-        The ARS2048B has 4 independent DMX ports. Set this app to <strong>Universe 0 → Port 1</strong>
-        and Freestyler to <strong>Universe 1 → Port 2</strong>. Both apps send to the same node
-        simultaneously with zero conflict — plug each set of lights into the matching port.
+        Set this app to <strong>Universe 0 → Port 1</strong> and Freestyler to <strong>Universe 1 → Port 2</strong>.
+        Both run simultaneously with zero conflict.
       </div>
     </div>
 
-    <!-- Fixtures -->
-    <div class="form-section">
-      <h3>Fixtures (Chauvet SlimPAR 56 — 7ch mode)</h3>
-      <table class="fixture-table">
-        <thead><tr><th>#</th><th>Name</th><th>DMX Start</th><th></th></tr></thead>
-        <tbody id="fixture-tbody"></tbody>
-      </table>
-      <button class="btn btn-secondary btn-sm" id="add-fixture-btn">+ Add Fixture</button>
-      <div style="margin-top:6px;font-size:.78rem;color:var(--muted)">
-        7ch spacing: set fixtures at 1, 8, 15, 22… Match these addresses on each fixture's dip switches.
-      </div>
-    </div>
-
-    <!-- Opus Quad -->
-    <div class="form-section">
-      <h3>Pioneer Opus Quad (DJ Link)</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Local IP (leave blank to auto-detect)</label>
-          <input type="text" id="cfg-opus-ip" placeholder="auto">
+    <!-- FIXTURES TAB -->
+    <div class="tab-pane" id="tab-fixtures">
+      <div class="form-sec">
+        <h3>Fixture List</h3>
+        <table class="fixture-tbl">
+          <thead><tr><th>#</th><th>Name</th><th>Profile</th><th>DMX Start</th><th>Universe</th><th>Group</th><th></th></tr></thead>
+          <tbody id="fix-tbody"></tbody>
+        </table>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sec btn-sm" id="add-fix-btn">+ Add Fixture</button>
         </div>
-        <div class="form-group" style="max-width:110px">
-          <label>Beat Port</label>
-          <input type="number" id="cfg-opus-beat">
-        </div>
-        <div class="form-group" style="max-width:110px">
-          <label>Status Port</label>
-          <input type="number" id="cfg-opus-status">
+        <div style="margin-top:6px;font-size:.72rem;color:var(--muted)">
+          Import OFL fixtures: drop JSON files into the <code>fixtures/</code> folder next to config.yaml.
+          They'll appear in the Profile dropdown automatically.
         </div>
       </div>
     </div>
 
-    <!-- Show defaults -->
-    <div class="form-section">
-      <h3>Show Defaults</h3>
-      <div class="form-row">
-        <div class="form-group" style="max-width:150px">
-          <label>Fallback BPM</label>
-          <input type="number" id="cfg-fallback-bpm" min="40" max="240" step="0.5">
+    <!-- AUDIO TAB -->
+    <div class="tab-pane" id="tab-audio-tab">
+      <div class="form-sec">
+        <h3>Behringer XR-18 (ASIO)</h3>
+        <div class="toggle-row">
+          <div class="toggle" id="t-audio"></div>
+          <label onclick="toggleClick('t-audio','c-audio-en')">Enable audio analysis</label>
+          <input type="hidden" id="c-audio-en" value="false">
+        </div>
+        <div class="form-row">
+          <div class="fg">
+            <label>Input Device</label>
+            <select id="c-audio-dev"><option value="">Loading…</option></select>
+          </div>
+          <div class="fg" style="max-width:80px"><label>Channels</label><input type="number" id="c-audio-ch" min="1" max="32" value="2"></div>
+          <div class="fg" style="max-width:80px"><label>Analyze Ch</label><input type="number" id="c-audio-inch" min="0" max="31" value="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="fg" style="max-width:110px"><label>Sample Rate</label><input type="number" id="c-audio-sr"></div>
+          <div class="fg" style="max-width:100px"><label>Block Size</label><input type="number" id="c-audio-bs"></div>
+        </div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:6px">
+          ASIO devices appear as "ASIO: …" in the list. Requires <code>pip install sounddevice numpy scipy</code> and the XR-18 ASIO driver.
         </div>
       </div>
     </div>
 
-    <div class="btn-row">
-      <button class="btn btn-primary" id="save-config-btn">💾 Save Configuration</button>
+    <!-- MIDI/OSC TAB -->
+    <div class="tab-pane" id="tab-midi-tab">
+      <div class="form-sec">
+        <h3>MIDI Controller</h3>
+        <div class="toggle-row">
+          <div class="toggle" id="t-midi"></div>
+          <label onclick="toggleClick('t-midi','c-midi-en')">Enable MIDI input</label>
+          <input type="hidden" id="c-midi-en" value="false">
+        </div>
+        <div class="form-row">
+          <div class="fg">
+            <label>MIDI Port</label>
+            <select id="c-midi-port"><option value="">First available</option></select>
+          </div>
+        </div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:4px">
+          Default mapping: CC7=brightness, CC1=show select, Note C3=blackout, D3=next show, E3=prev, F3=tap<br>
+          Requires <code>pip install mido python-rtmidi</code>
+        </div>
+      </div>
+      <div class="form-sec">
+        <h3>OSC Server (TouchOSC / Lemur)</h3>
+        <div class="toggle-row">
+          <div class="toggle" id="t-osc"></div>
+          <label onclick="toggleClick('t-osc','c-osc-en')">Enable OSC server</label>
+          <input type="hidden" id="c-osc-en" value="false">
+        </div>
+        <div class="form-row">
+          <div class="fg" style="max-width:90px"><label>Port</label><input type="number" id="c-osc-port" value="8000"></div>
+        </div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:4px">
+          Addresses: /lighting/show, /lighting/brightness, /lighting/blackout, /lighting/tap, /lighting/color, /lighting/scene<br>
+          Requires <code>pip install python-osc</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPUS QUAD TAB -->
+    <div class="tab-pane" id="tab-opus-tab">
+      <div class="form-sec">
+        <h3>Pioneer Opus Quad (Pro DJ Link)</h3>
+        <div class="form-row">
+          <div class="fg"><label>Local IP (blank = auto)</label><input type="text" id="c-opus-ip" placeholder="auto-detect"></div>
+          <div class="fg" style="max-width:100px"><label>Beat Port</label><input type="number" id="c-opus-bp"></div>
+          <div class="fg" style="max-width:100px"><label>Status Port</label><input type="number" id="c-opus-sp"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHOW TAB -->
+    <div class="tab-pane" id="tab-show-tab">
+      <div class="form-sec">
+        <div class="form-row">
+          <div class="fg" style="max-width:130px"><label>Fallback BPM</label><input type="number" id="c-fbpm" min="40" max="240" step="0.5"></div>
+          <div class="fg" style="max-width:130px"><label>Strobe Max Hz</label><input type="number" id="c-strobe" min="0.5" max="25" step="0.5"></div>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle" id="t-autobipm"></div>
+          <label onclick="toggleClick('t-autobipm','c-autobipm')">Auto-select show by BPM</label>
+          <input type="hidden" id="c-autobipm" value="false">
+        </div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:4px">
+          BPM ranges: &lt;80→fire, 80-100→color_cycle, 100-120→pulse, 120-135→beat_strobe, 135-150→chase, &gt;150→rainbow
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILES TAB -->
+    <div class="tab-pane" id="tab-profiles-tab">
+      <div class="form-sec">
+        <h3>Saved Profiles</h3>
+        <div class="profiles-row" id="profiles-row"></div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <input type="text" id="profile-name" placeholder="Profile name…"
+            style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:.82rem;flex:1;min-width:140px;outline:none">
+          <button class="btn btn-sec btn-sm" id="save-profile-btn">💾 Save Profile</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="save-cfg-btn">💾 Save &amp; Apply</button>
     </div>
   </div>
 </div>
 
+</div><!-- end app-grid -->
 <div id="toast"></div>
 
 <script>
-// -------------------------------------------------------------------------
-// SSE — live status updates
-// -------------------------------------------------------------------------
+// ============================================================
+// STATE
+// ============================================================
+let lastStatus = {};
+let brightDrag = false, transDrag = false;
+let brightTimer, transTimer;
+let profileList = [];
+let fixProfiles = [];
+let cfgData = {};
+
+// ============================================================
+// SSE — live status
+// ============================================================
 const es = new EventSource('/events');
-es.onmessage = e => applyStatus(JSON.parse(e.data));
-es.onerror   = () => setConnState('error');
+es.onmessage = e => { lastStatus = JSON.parse(e.data); applyStatus(lastStatus); };
+es.onerror   = () => { document.getElementById('conn-dot').className='dot off'; };
 
-let activePip = 0;
-
+let lastPip = 0;
 function applyStatus(s) {
   // Connection dot
-  const dot   = document.getElementById('conn-dot');
-  const label = document.getElementById('conn-label');
-  dot.className = 'dot';
+  const dot = document.getElementById('conn-dot');
+  const lbl = document.getElementById('conn-lbl');
   if (s.connected && !s.using_fallback) {
-    dot.classList.add('connected');
-    label.textContent = 'Opus Quad connected';
-  } else if (s.connected && s.using_fallback) {
-    dot.classList.add('fallback');
-    label.textContent = 'Using fallback BPM';
+    dot.className='dot on'; lbl.textContent='Opus Quad connected';
+  } else if (s.using_fallback && s.connected) {
+    dot.className='dot warn'; lbl.textContent='Fallback BPM';
   } else {
-    dot.classList.add('disconnected');
-    label.textContent = 'No DJ Link signal';
+    dot.className='dot off'; lbl.textContent='No DJ Link signal';
   }
 
   // BPM
-  document.getElementById('bpm-display').textContent = s.bpm > 0 ? s.bpm.toFixed(1) : '—';
+  document.getElementById('bpm-num').textContent = s.bpm > 0 ? s.bpm.toFixed(1) : '—';
+
+  // Badges
+  document.getElementById('badge-idle').classList.toggle('show', s.is_idle);
+  document.getElementById('badge-bo').classList.toggle('show', s.blackout);
+  document.getElementById('blackout-btn').classList.toggle('active', s.blackout);
 
   // Beat pips
-  if (s.beat_number !== activePip) {
-    activePip = s.beat_number;
-    for (let i = 1; i <= 4; i++) {
-      document.getElementById('pip-' + i).classList.toggle('active', i === activePip);
-    }
+  if (s.beat_number !== lastPip) {
+    lastPip = s.beat_number;
+    for (let i=1;i<=4;i++) document.getElementById('pip-'+i).classList.toggle('on', i===lastPip);
   }
 
-  // Idle badge
-  document.getElementById('idle-badge').classList.toggle('visible', s.is_idle);
+  // Tap BPM display
+  if (s.tap_bpm) document.getElementById('tap-bpm').textContent = s.tap_bpm.toFixed(1)+' BPM';
 
-  // Deck cards
-  for (let d = 1; d <= 4; d++) {
-    const info = s.decks[String(d)];
-    const card  = document.getElementById('deck-' + d);
-    const state = card.querySelector('.deck-state');
-    const bpm   = card.querySelector('.deck-bpm');
-    if (!info.seen) {
-      card.className = 'deck-card';
-      state.textContent = '—';
-      bpm.textContent   = '—';
-    } else if (info.playing) {
-      card.className = 'deck-card playing';
-      state.textContent = '▶';
-      bpm.textContent   = info.bpm ? info.bpm.toFixed(1) + ' bpm' : '—';
-    } else {
-      card.className = 'deck-card';
-      state.textContent = '⏸';
-      bpm.textContent   = '—';
-    }
+  // Decks
+  for (let d=1;d<=4;d++) {
+    const info = s.decks?.[String(d)] || {};
+    const el = document.getElementById('deck-'+d);
+    const icon = el.querySelector('.deck-icon');
+    const bpm  = el.querySelector('.deck-bpm');
+    el.className = 'deck' + (info.playing ? ' playing' : '');
+    if (!info.seen) { icon.textContent='—'; bpm.textContent='—'; }
+    else if (info.playing) { icon.textContent='▶'; bpm.textContent=info.bpm?info.bpm.toFixed(1)+' bpm':'—'; }
+    else { icon.textContent='⏸'; bpm.textContent='—'; }
   }
 
-  // Active show highlight
-  document.querySelectorAll('.show-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.show === s.show_name);
+  // Active show
+  document.querySelectorAll('.show-btn').forEach(b => b.classList.toggle('active', b.dataset.show===s.show_name));
+
+  // Brightness & transition sliders (only when not dragging)
+  if (!brightDrag) {
+    const pct = Math.round(s.brightness*100);
+    document.getElementById('brightness').value = pct;
+    document.getElementById('bright-val').textContent = pct+'%';
+  }
+
+  // Audio viz
+  const audio = s.audio || {};
+  const hasAudio = audio.energy !== undefined;
+  document.getElementById('no-audio-msg').style.display = hasAudio ? 'none' : 'block';
+  document.getElementById('viz-bars').style.display = hasAudio ? 'grid' : 'none';
+  if (hasAudio) {
+    setBar('bass',  audio.bass);
+    setBar('mid',   audio.mid);
+    setBar('high',  audio.high);
+    setBar('energy',audio.energy);
+  }
+
+  // Active scene chip highlight
+  document.querySelectorAll('.scene-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.name === s.active_scene);
   });
-
-  // Brightness slider (only update if user isn't dragging)
-  if (!sliderDragging) {
-    const pct = Math.round(s.brightness * 100);
-    document.getElementById('brightness-slider').value = pct;
-    document.getElementById('brightness-val').textContent = pct + '%';
-  }
 }
 
-function setConnState(st) {
-  document.getElementById('conn-dot').className = 'dot disconnected';
-  document.getElementById('conn-label').textContent = 'Connection error — retrying…';
+function setBar(id, val) {
+  const pct = Math.round((val||0)*100);
+  document.getElementById('bar-'+id).style.height = pct+'%';
+  document.getElementById('val-'+id).textContent = pct+'%';
 }
 
-// -------------------------------------------------------------------------
-// Show buttons
-// -------------------------------------------------------------------------
+// ============================================================
+// SHOW BUTTONS
+// ============================================================
 document.getElementById('show-grid').addEventListener('click', e => {
-  const btn = e.target.closest('.show-btn');
-  if (!btn) return;
-  fetch('/api/show', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({name: btn.dataset.show})
-  }).then(r => r.json()).then(() => toast('Show: ' + btn.textContent))
-    .catch(() => toast('Error switching show', true));
+  const b = e.target.closest('.show-btn');
+  if (!b) return;
+  api('/api/show','POST',{name:b.dataset.show}).then(()=>toast('Show: '+b.textContent.trim()));
+});
+document.getElementById('prev-show').addEventListener('click',()=>api('/api/prev_show','POST'));
+document.getElementById('next-show').addEventListener('click',()=>api('/api/next_show','POST'));
+
+// ============================================================
+// CONTROLS
+// ============================================================
+document.getElementById('blackout-btn').addEventListener('click',()=>
+  api('/api/blackout','POST').then(r=>toast(r.blackout?'BLACKOUT ON':'BLACKOUT OFF')));
+
+document.getElementById('tap-btn').addEventListener('click',()=>
+  api('/api/tap','POST').then(r=>{ if(r.bpm) toast('Tap: '+r.bpm.toFixed(1)+' BPM'); }));
+
+// Brightness
+const bslider = document.getElementById('brightness');
+bslider.addEventListener('mousedown',()=>brightDrag=true);
+bslider.addEventListener('touchstart',()=>brightDrag=true,{passive:true});
+bslider.addEventListener('mouseup',()=>brightDrag=false);
+bslider.addEventListener('touchend',()=>brightDrag=false);
+bslider.addEventListener('input',()=>{
+  const v=bslider.value;
+  document.getElementById('bright-val').textContent=v+'%';
+  clearTimeout(brightTimer);
+  brightTimer=setTimeout(()=>api('/api/brightness','POST',{value:v/100}),150);
 });
 
-// -------------------------------------------------------------------------
-// Brightness slider
-// -------------------------------------------------------------------------
-let sliderDragging = false;
-let brightnessTimer = null;
-const slider = document.getElementById('brightness-slider');
+// Transition (local only — saved with config)
+const tslider = document.getElementById('transition');
+tslider.addEventListener('input',()=>{
+  const v = (tslider.value/10).toFixed(1);
+  document.getElementById('trans-val').textContent=v+' beats';
+});
 
-slider.addEventListener('mousedown', () => sliderDragging = true);
-slider.addEventListener('touchstart', () => sliderDragging = true);
-slider.addEventListener('mouseup',   () => sliderDragging = false);
-slider.addEventListener('touchend',  () => sliderDragging = false);
-
-slider.addEventListener('input', () => {
-  const val = slider.value;
-  document.getElementById('brightness-val').textContent = val + '%';
-  clearTimeout(brightnessTimer);
-  brightnessTimer = setTimeout(() => {
-    fetch('/api/brightness', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({value: val / 100})
+// ============================================================
+// SCENES
+// ============================================================
+function loadScenes() {
+  api('/api/scenes').then(r=>{
+    const list = document.getElementById('scene-list');
+    list.innerHTML='';
+    if (!r.scenes.length) { list.innerHTML='<span style="color:var(--muted);font-size:.78rem">No scenes saved yet.</span>'; return; }
+    r.scenes.forEach(s=>{
+      const chip=document.createElement('div');
+      chip.className='scene-chip'; chip.dataset.name=s.name;
+      chip.innerHTML=`<button class="scene-play" title="Play">▶</button>
+        <span>${s.name}</span><span style="color:var(--muted);font-size:.7rem;margin-left:2px">(${s.fade_time}s)</span>
+        <button class="scene-del" title="Delete">✕</button>`;
+      chip.querySelector('.scene-play').addEventListener('click',()=>
+        api('/api/scenes/play','POST',{name:s.name}).then(()=>toast('Scene: '+s.name)));
+      chip.querySelector('.scene-del').addEventListener('click',()=>
+        api('/api/scenes/'+encodeURIComponent(s.name),'DELETE').then(()=>{toast('Deleted'); loadScenes();}));
+      list.appendChild(chip);
     });
-  }, 200);
+  });
+}
+document.getElementById('capture-btn').addEventListener('click',()=>{
+  const name=document.getElementById('scene-name').value.trim();
+  if (!name) { toast('Enter a scene name',true); return; }
+  const fade=parseFloat(document.getElementById('scene-fade').value)||0;
+  api('/api/scenes/capture','POST',{name,fade_time:fade}).then(()=>{toast('Scene captured: '+name);loadScenes();});
 });
+document.getElementById('stop-scene-btn').addEventListener('click',()=>api('/api/scenes/stop','POST'));
+loadScenes();
 
-// -------------------------------------------------------------------------
-// Config accordion
-// -------------------------------------------------------------------------
-document.getElementById('config-header').addEventListener('click', function() {
+// ============================================================
+// TRACKS
+// ============================================================
+function loadTracks() {
+  api('/api/tracks').then(r=>{
+    const tbody=document.getElementById('track-tbody');
+    if (!r.tracks?.length) return;
+    tbody.innerHTML='';
+    r.tracks.forEach(t=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${t.title||'—'}</td><td>${t.artist||'—'}</td>
+        <td style="color:var(--accent2)">${t.bpm?t.bpm.toFixed(1):'—'}</td>
+        <td>${t.key||'—'}</td><td style="color:var(--accent)">${t.show||'—'}</td>
+        <td><button class="btn btn-sec btn-sm" data-tid="${t.track_id}">Use show</button></td>`;
+      tr.querySelector('button').addEventListener('click',()=>{
+        const show=lastStatus.show_name||'beat_strobe';
+        api('/api/tracks/setting','POST',{track_id:t.track_id,show_name:show,brightness:lastStatus.brightness||1})
+          .then(()=>{toast('Saved show for track');loadTracks();});
+      });
+      tbody.appendChild(tr);
+    });
+  });
+}
+loadTracks();
+
+// ============================================================
+// CONFIG ACCORDION + TABS
+// ============================================================
+document.getElementById('cfg-hdr').addEventListener('click',function(){
   this.classList.toggle('open');
-  document.getElementById('config-body').classList.toggle('open');
-  if (document.getElementById('config-body').classList.contains('open')) {
-    loadConfig();
-  }
+  document.getElementById('cfg-body').classList.toggle('open');
+  if (document.getElementById('cfg-body').classList.contains('open')) loadConfig();
 });
 
-let configData = null;
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',function(){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(x=>x.classList.remove('active'));
+  this.classList.add('active');
+  document.getElementById('tab-'+this.dataset.tab).classList.add('active');
+}));
 
 async function loadConfig() {
-  const r = await fetch('/api/config');
-  configData = await r.json();
-  populateForm(configData);
+  cfgData = await api('/api/config');
+  populateForm(cfgData);
+  // Load audio devices
+  const devs = await api('/api/audio/devices');
+  const sel = document.getElementById('c-audio-dev');
+  sel.innerHTML='<option value="">— select device —</option>';
+  (devs.devices||[]).forEach(d=>{
+    const opt=document.createElement('option');
+    opt.value=d.index;
+    opt.textContent=`${d.index}: ${d.name}${d.is_asio?' [ASIO]':''} (${d.channels}ch)`;
+    if (cfgData.audio?.device_index == d.index) opt.selected=true;
+    sel.appendChild(opt);
+  });
+  // Load MIDI ports
+  const midi = await api('/api/midi/ports');
+  const msel = document.getElementById('c-midi-port');
+  msel.innerHTML='<option value="">First available</option>';
+  (midi.ports||[]).forEach(p=>{
+    const opt=document.createElement('option');
+    opt.value=p; opt.textContent=p;
+    if (cfgData.midi?.port_name===p) opt.selected=true;
+    msel.appendChild(opt);
+  });
+  // Load fixture profiles
+  const fp = await api('/api/fixture_profiles');
+  fixProfiles = fp.profiles||[];
+  rebuildFixtureTable(cfgData.fixtures||[]);
+  // Load profiles
+  loadProfiles();
 }
 
 function populateForm(cfg) {
-  document.getElementById('cfg-artnet-host').value    = cfg.artnet?.host    ?? '2.0.0.1';
-  document.getElementById('cfg-artnet-universe').value= cfg.artnet?.universe ?? 0;
-  document.getElementById('cfg-artnet-port').value    = cfg.artnet?.port     ?? 6454;
-  document.getElementById('cfg-opus-ip').value        = cfg.opus_quad?.local_ip    ?? '';
-  document.getElementById('cfg-opus-beat').value      = cfg.opus_quad?.beat_port   ?? 50001;
-  document.getElementById('cfg-opus-status').value    = cfg.opus_quad?.status_port ?? 50002;
-  document.getElementById('cfg-fallback-bpm').value   = cfg.show?.fallback_bpm ?? 128;
-  buildFixtureTable(cfg.fixtures ?? []);
+  set('c-artnet-host', cfg.artnet?.host||'2.0.0.1');
+  set('c-artnet-uni',  cfg.artnet?.universe??0);
+  set('c-artnet-port', cfg.artnet?.port||6454);
+  setToggle('t-sacn','c-sacn-en', cfg.sacn?.enabled||false);
+  set('c-sacn-uni',  cfg.sacn?.universe||1);
+  setToggle('t-audio','c-audio-en', cfg.audio?.enabled||false);
+  set('c-audio-ch',  cfg.audio?.channels||2);
+  set('c-audio-inch',cfg.audio?.input_channel||0);
+  set('c-audio-sr',  cfg.audio?.samplerate||48000);
+  set('c-audio-bs',  cfg.audio?.blocksize||1024);
+  setToggle('t-midi','c-midi-en', cfg.midi?.enabled||false);
+  setToggle('t-osc', 'c-osc-en',  cfg.osc?.enabled||false);
+  set('c-osc-port',  cfg.osc?.port||8000);
+  set('c-opus-ip',   cfg.opus_quad?.local_ip||'');
+  set('c-opus-bp',   cfg.opus_quad?.beat_port||50001);
+  set('c-opus-sp',   cfg.opus_quad?.status_port||50002);
+  set('c-fbpm',      cfg.show?.fallback_bpm||128);
+  set('c-strobe',    cfg.show?.strobe_max_hz||10);
+  setToggle('t-autobipm','c-autobipm', cfg.show?.auto_select_by_bpm||false);
+  document.getElementById('transition').value = Math.round((cfg.show?.transition_beats||2)*10);
+  document.getElementById('trans-val').textContent = (cfg.show?.transition_beats||2).toFixed(1)+' beats';
 }
 
-// ---- Fixture table ----
-function buildFixtureTable(fixtures) {
-  const tbody = document.getElementById('fixture-tbody');
-  tbody.innerHTML = '';
-  fixtures.forEach((f, i) => addFixtureRow(i + 1, f.name, f.dmx_start));
+function set(id,val){ const el=document.getElementById(id); if(el) el.value=val; }
+
+// Toggle helpers
+function setToggle(toggleId, hiddenId, val) {
+  const t=document.getElementById(toggleId);
+  const h=document.getElementById(hiddenId);
+  if (!t||!h) return;
+  t.classList.toggle('on', !!val);
+  h.value = val?'true':'false';
+}
+function toggleClick(toggleId, hiddenId) {
+  const t=document.getElementById(toggleId);
+  const h=document.getElementById(hiddenId);
+  if (!t||!h) return;
+  const newVal = h.value!=='true';
+  t.classList.toggle('on', newVal);
+  h.value = newVal?'true':'false';
 }
 
-function addFixtureRow(num, name, dmx) {
-  const tbody = document.getElementById('fixture-tbody');
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td style="color:var(--muted);padding:4px 8px;font-size:.8rem">${tbody.children.length + 1}</td>
-    <td><input type="text" placeholder="Par ${num}" value="${name ?? ''}"></td>
-    <td><input type="number" min="1" max="512" value="${dmx ?? ''}"></td>
-    <td><button class="btn-icon" title="Remove">✕</button></td>
-  `;
-  tr.querySelector('.btn-icon').addEventListener('click', () => {
-    tr.remove();
-    renumberRows();
-  });
+// Fixture table
+function rebuildFixtureTable(fixtures) {
+  const tbody=document.getElementById('fix-tbody');
+  tbody.innerHTML='';
+  fixtures.forEach((f,i)=>addFixtureRow(i+1,f));
+}
+function addFixtureRow(num, f={}) {
+  const tbody=document.getElementById('fix-tbody');
+  const tr=document.createElement('tr');
+  const profOpts = fixProfiles.map(p=>
+    `<option value="${p.key}" ${p.key===(f.profile||'chauvet_slimpar56_7ch')?'selected':''}>${p.name} (${p.channels}ch)</option>`
+  ).join('');
+  tr.innerHTML=`
+    <td style="color:var(--muted);padding:4px 6px;font-size:.75rem">${tbody.children.length+1}</td>
+    <td><input type="text" value="${f.name||''}" placeholder="Par ${num}"></td>
+    <td><select>${profOpts}</select></td>
+    <td><input type="number" min="1" max="512" value="${f.dmx_start||1}" style="width:60px"></td>
+    <td><input type="number" min="0" max="3" value="${f.universe||0}" style="width:50px"></td>
+    <td><input type="text" value="${f.group||'main'}" style="width:65px"></td>
+    <td><button class="btn-icon">✕</button></td>`;
+  tr.querySelector('.btn-icon').addEventListener('click',()=>{tr.remove();renumFix();});
   tbody.appendChild(tr);
 }
-
-function renumberRows() {
-  document.querySelectorAll('#fixture-tbody tr').forEach((tr, i) => {
-    tr.querySelector('td:first-child').textContent = i + 1;
-  });
+function renumFix(){
+  document.querySelectorAll('#fix-tbody tr').forEach((tr,i)=>tr.querySelector('td:first-child').textContent=i+1);
 }
-
-document.getElementById('add-fixture-btn').addEventListener('click', () => {
-  const rows = document.querySelectorAll('#fixture-tbody tr');
-  const lastDmx = rows.length > 0
-    ? parseInt(rows[rows.length - 1].querySelector('input[type=number]').value) + 7
-    : 1;
-  addFixtureRow(rows.length + 1, '', lastDmx);
+document.getElementById('add-fix-btn').addEventListener('click',()=>{
+  const rows=document.querySelectorAll('#fix-tbody tr');
+  const lastDmx = rows.length ? parseInt(rows[rows.length-1].querySelectorAll('input')[1].value)+7 : 1;
+  addFixtureRow(rows.length+1,{dmx_start:lastDmx});
 });
 
-// ---- Gather form data ----
 function collectConfig() {
-  const fixtures = [];
-  document.querySelectorAll('#fixture-tbody tr').forEach(tr => {
-    const inputs = tr.querySelectorAll('input');
-    fixtures.push({name: inputs[0].value, dmx_start: parseInt(inputs[1].value)});
+  const fixes=[];
+  document.querySelectorAll('#fix-tbody tr').forEach(tr=>{
+    const ins=tr.querySelectorAll('input');
+    const sel=tr.querySelector('select');
+    fixes.push({name:ins[0].value,profile:sel.value,dmx_start:parseInt(ins[1].value),
+      universe:parseInt(ins[2].value),group:ins[3].value});
   });
+  const transBeats = parseFloat(document.getElementById('transition').value)/10;
   return {
-    artnet: {
-      host:     document.getElementById('cfg-artnet-host').value,
-      universe: parseInt(document.getElementById('cfg-artnet-universe').value),
-      port:     parseInt(document.getElementById('cfg-artnet-port').value),
-    },
-    fixtures,
-    opus_quad: {
-      local_ip:      document.getElementById('cfg-opus-ip').value,
-      beat_port:     parseInt(document.getElementById('cfg-opus-beat').value),
-      status_port:   parseInt(document.getElementById('cfg-opus-status').value),
-      announce_port: 50000,
-    },
-    show: {
-      fallback_bpm: parseFloat(document.getElementById('cfg-fallback-bpm').value),
-      active_show: configData?.show?.active_show ?? 'beat_strobe',
-      brightness:  configData?.show?.brightness  ?? 1.0,
-      transition:  configData?.show?.transition  ?? 0.3,
-    }
+    artnet:{host:v('c-artnet-host'),universe:parseInt(v('c-artnet-uni')),port:parseInt(v('c-artnet-port'))},
+    sacn:{enabled:v('c-sacn-en')==='true',universe:parseInt(v('c-sacn-uni'))},
+    fixtures:fixes,
+    opus_quad:{local_ip:v('c-opus-ip'),beat_port:parseInt(v('c-opus-bp')),
+      status_port:parseInt(v('c-opus-sp')),announce_port:50000},
+    audio:{enabled:v('c-audio-en')==='true',
+      device_index:v('c-audio-dev')!==''?parseInt(v('c-audio-dev')):null,
+      channels:parseInt(v('c-audio-ch')),samplerate:parseInt(v('c-audio-sr')),
+      blocksize:parseInt(v('c-audio-bs')),input_channel:parseInt(v('c-audio-inch'))},
+    midi:{enabled:v('c-midi-en')==='true',port_name:v('c-midi-port')||null},
+    osc:{enabled:v('c-osc-en')==='true',host:'0.0.0.0',port:parseInt(v('c-osc-port'))},
+    dmx_input:{enabled:false,universe:2},
+    show:{fallback_bpm:parseFloat(v('c-fbpm')),active_show:cfgData.show?.active_show||'beat_strobe',
+      brightness:cfgData.show?.brightness||1.0,transition_beats:transBeats,
+      auto_select_by_bpm:v('c-autobipm')==='true',
+      strobe_max_hz:parseFloat(v('c-strobe')),blackout:false},
+    profiles_dir:cfgData.profiles_dir||'profiles',
+    data_dir:cfgData.data_dir||'data',
   };
 }
+function v(id){const el=document.getElementById(id);return el?el.value:'';}
 
-document.getElementById('save-config-btn').addEventListener('click', async () => {
-  const cfg = collectConfig();
-  try {
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(cfg)
-    });
-    configData = cfg;
-    toast('Configuration saved & applied');
-  } catch {
-    toast('Failed to save config', true);
-  }
+document.getElementById('save-cfg-btn').addEventListener('click',async()=>{
+  const cfg=collectConfig();
+  await api('/api/config','POST',cfg);
+  cfgData=cfg;
+  toast('Configuration saved & applied');
 });
 
-// -------------------------------------------------------------------------
-// Art-Net discovery
-// -------------------------------------------------------------------------
-document.getElementById('discover-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('discover-btn');
-  const results = document.getElementById('discover-results');
-  btn.textContent = '🔍 Scanning (3s)…';
-  btn.disabled = true;
-  results.innerHTML = '';
+// ============================================================
+// ART-NET DISCOVERY
+// ============================================================
+document.getElementById('discover-btn').addEventListener('click',async()=>{
+  const btn=document.getElementById('discover-btn');
+  const res=document.getElementById('discover-results');
+  btn.textContent='🔍 Scanning…'; btn.disabled=true; res.innerHTML='';
   try {
-    const r = await fetch('/api/discover', {method: 'POST'});
-    const data = await r.json();
-    if (!data.nodes.length) {
-      results.innerHTML = '<div style="color:var(--muted);font-size:.82rem;margin-top:6px">No nodes found. Check network/IP.</div>';
+    const data=await api('/api/discover','POST');
+    if (!data.nodes?.length) {
+      res.innerHTML='<div style="color:var(--muted);font-size:.78rem;margin-top:5px">No nodes found. Check network.</div>';
     } else {
-      data.nodes.forEach(n => {
-        const row = document.createElement('div');
-        row.className = 'node-row';
-        row.innerHTML = `
-          <div class="node-info">
-            <span class="node-ip">${n.sender ?? n.ip}</span>
-            &nbsp;—&nbsp;${n.short_name || 'Unknown'}
-            <span style="color:var(--muted);font-size:.78rem"> (${n.num_ports} ports)</span>
-          </div>
-          <button class="btn btn-secondary btn-sm use-ip-btn">Use this IP</button>
-        `;
-        row.querySelector('.use-ip-btn').addEventListener('click', () => {
-          document.getElementById('cfg-artnet-host').value = n.sender ?? n.ip;
-          toast('IP set to ' + (n.sender ?? n.ip));
+      data.nodes.forEach(n=>{
+        const row=document.createElement('div'); row.className='node-row';
+        row.innerHTML=`<div><span class="node-ip">${n.sender||n.ip}</span> — ${n.short_name||'Unknown'} <span style="color:var(--muted);font-size:.72rem">(${n.num_ports} ports)</span></div>
+          <button class="btn btn-sec btn-sm">Use IP</button>`;
+        row.querySelector('button').addEventListener('click',()=>{
+          set('c-artnet-host', n.sender||n.ip); toast('IP set');
         });
-        results.appendChild(row);
+        res.appendChild(row);
       });
     }
-  } catch {
-    results.innerHTML = '<div style="color:var(--red);font-size:.82rem;margin-top:6px">Discovery failed.</div>';
-  }
-  btn.textContent = '🔍 Scan for Art-Net Nodes';
-  btn.disabled = false;
+  } catch { res.innerHTML='<div style="color:var(--red);font-size:.78rem">Discovery failed.</div>'; }
+  btn.textContent='🔍 Scan for Nodes'; btn.disabled=false;
 });
 
-// -------------------------------------------------------------------------
-// Toast helper
-// -------------------------------------------------------------------------
+// ============================================================
+// PROFILES
+// ============================================================
+async function loadProfiles() {
+  const r=await api('/api/profiles');
+  profileList=r.profiles||[];
+  const row=document.getElementById('profiles-row');
+  row.innerHTML='';
+  profileList.forEach(name=>{
+    const chip=document.createElement('div'); chip.className='profile-chip';
+    chip.innerHTML=`<span>${name}</span>
+      <button title="Load" data-action="load" data-name="${name}">↓</button>
+      <button title="Delete" data-action="del" data-name="${name}">✕</button>`;
+    chip.querySelectorAll('button').forEach(b=>b.addEventListener('click',async()=>{
+      if (b.dataset.action==='load') {
+        await api('/api/profiles/load','POST',{name:b.dataset.name});
+        cfgData=await api('/api/config');
+        populateForm(cfgData);
+        toast('Profile loaded: '+b.dataset.name);
+      } else {
+        await api('/api/profiles/'+encodeURIComponent(b.dataset.name),'DELETE');
+        toast('Profile deleted'); loadProfiles();
+      }
+    }));
+    row.appendChild(chip);
+  });
+}
+document.getElementById('save-profile-btn').addEventListener('click',async()=>{
+  const name=document.getElementById('profile-name').value.trim();
+  if (!name) { toast('Enter a profile name',true); return; }
+  await api('/api/profiles/save','POST',{name});
+  toast('Profile saved: '+name); loadProfiles();
+});
+
+// ============================================================
+// KEYBOARD SHORTCUTS
+// ============================================================
+const SHOW_KEYS = ['beat_strobe','color_cycle','pulse','chase','fire','rainbow','thunderstorm','bass_reactive','spectrum'];
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
+  const key=e.key;
+  if (key>='1'&&key<='9') {
+    const show=SHOW_KEYS[parseInt(key)-1];
+    if (show) api('/api/show','POST',{name:show}).then(()=>toast(show));
+  } else if (key===' ') {
+    e.preventDefault(); api('/api/blackout','POST');
+  } else if (key==='ArrowRight') {
+    api('/api/next_show','POST');
+  } else if (key==='ArrowLeft') {
+    api('/api/prev_show','POST');
+  } else if (key==='t'||key==='T') {
+    api('/api/tap','POST').then(r=>{ if(r.bpm) toast('Tap: '+r.bpm.toFixed(1)+' BPM'); });
+  } else if (key==='+'||key==='=') {
+    const cur=parseInt(document.getElementById('brightness').value);
+    const nv=Math.min(100,cur+5);
+    document.getElementById('brightness').value=nv;
+    api('/api/brightness','POST',{value:nv/100});
+  } else if (key==='-') {
+    const cur=parseInt(document.getElementById('brightness').value);
+    const nv=Math.max(0,cur-5);
+    document.getElementById('brightness').value=nv;
+    api('/api/brightness','POST',{value:nv/100});
+  }
+});
+
+// ============================================================
+// UTILS
+// ============================================================
+async function api(url, method='GET', body=null) {
+  const opts = {method, headers:{}};
+  if (body) { opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
 let toastTimer;
-function toast(msg, isError = false) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'show' + (isError ? ' error' : '');
+function toast(msg, isErr=false) {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='show'+(isErr?' err':'');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.className = '', 2500);
+  toastTimer=setTimeout(()=>el.className='',2800);
 }
 </script>
 </body>
