@@ -1,9 +1,32 @@
 # OpusQuad Lighting Configuration
 
+# ---------------------------------------------------------------------------
+# PKnight Easynode ARS2048B — Art-Net/sACN/RDM Controller
+# ---------------------------------------------------------------------------
+# The ARS2048B has 4 DMX output ports. Each port maps to one Art-Net universe:
+#   Port 1  →  Universe 0   (DMX addresses 1-512)
+#   Port 2  →  Universe 1   (DMX addresses 1-512 on that port)
+#   Port 3  →  Universe 2
+#   Port 4  →  Universe 3
+#
+# Connect all 4 SlimPAR 56s to Port 1 (they share the same DMX run).
+#
+# Finding the device IP:
+#   Option A — Static Art-Net IP: The ARS2048B defaults to 2.0.0.1 with
+#              subnet 255.0.0.0. Set your PC's ethernet adapter to 2.x.x.x /8
+#              on the same interface, then ping 2.0.0.1.
+#   Option B — DHCP: If you set the node to DHCP mode via its web UI,
+#              check your router's device list for "ARS2048" or run:
+#                python discover.py
+#              to find it automatically via ArtPoll.
+#   Option C — Broadcast: Set host to "2.255.255.255" (Art-Net broadcast)
+#              to reach the node without knowing its exact IP. Slightly
+#              chattier but works fine on a home network.
+
 artnet:
-  host: "2.0.0.1"          # Art-Net controller IP (or broadcast: 2.255.255.255)
-  port: 6454
-  universe: 0
+  host: "2.0.0.1"     # change to your node's IP, or use "2.255.255.255" to broadcast
+  port: 6454           # standard Art-Net UDP port — do not change
+  universe: 0          # Port 1 on the ARS2048B = universe 0
 
 # DMX start addresses for each SlimPAR 56 fixture (1-based, as set on the light).
 # In 7-channel mode each fixture occupies 7 addresses, so space them 8 apart
