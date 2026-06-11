@@ -27,8 +27,11 @@ class BaseShow(ABC):
     def update(self, dt: float, beat_phase: float, bpm: float, beat_number: int) -> None:
         self._elapsed += dt
         self._render(dt, beat_phase, bpm, beat_number)
+        # Apply master brightness via the dimmer channel (ch7) rather than
+        # scaling RGB, so colors stay saturated at all brightness levels.
+        dim = round(255 * max(0.0, min(1.0, self.brightness)))
         for fix in self.fixtures:
-            fix.color = fix.color.scale(self.brightness)
+            fix.dimmer = dim
 
     @abstractmethod
     def _render(self, dt: float, beat_phase: float, bpm: float, beat_number: int) -> None:
@@ -54,18 +57,16 @@ class BeatStrobeShow(BaseShow):
                 self._color_idx = (self._color_idx + 1) % len(COLOR_WHEEL)
                 self._current_color = COLOR_WHEEL[self._color_idx]
 
-        # Flash on beat (first 10% of beat = white pop), then hold color
-        if beat_phase < 0.10:
-            flash = 1.0 - (beat_phase / 0.10)
-            base = lerp_color(self._current_color, COLORS["white"], flash * 0.8)
-        else:
-            # Gentle decay
-            decay = 1.0 - (beat_phase - 0.10) * 0.3
-            base = self._current_color.scale(max(0.6, decay))
-
-        for i, fix in enumerate(self.fixtures):
-            fix.color = base
+        for fix in self.fixtures:
+            fix.color = self._current_color
             fix.strobe = 0
+            # Bright pop on beat onset, gentle decay through the rest of the beat
+            if beat_phase < 0.10:
+                flash = 1.0 - (beat_phase / 0.10)
+                fix.dimmer = round(255 * (0.7 + flash * 0.3) * self.brightness)
+            else:
+                decay = 1.0 - (beat_phase - 0.10) * 0.35
+                fix.dimmer = round(255 * max(0.55, decay) * self.brightness)
 
 
 # ---------------------------------------------------------------------------
@@ -157,15 +158,12 @@ class FireShow(BaseShow):
                 + 0.05 * math.sin(t * 13.0 + 2.4)
             )
             flicker = max(0.3, min(1.0, flicker))
-            # Beat punch
+            # Beat punch — boost dimmer briefly on each beat
             punch = max(0, 1.0 - beat_phase * 3) * 0.3 if beat_phase < 0.33 else 0
-            brightness = min(1.0, flicker + punch)
-            fix.color = RGBA(
-                r=round(255 * brightness),
-                g=round(80 * brightness * flicker),
-                b=0,
-                a=round(200 * brightness),
-            )
+            intensity = min(1.0, flicker + punch)
+            # Warm orange-red color at full saturation; dimmer carries intensity
+            fix.color = RGBA(r=255, g=round(80 * flicker), b=0)
+            fix.dimmer = round(255 * intensity * self.brightness)
             fix.strobe = 0
 
 

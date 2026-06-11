@@ -5,16 +5,19 @@ artnet:
   port: 6454
   universe: 0
 
-# DMX start addresses for each SlimPAR 56 fixture (1-based, as set on the light)
+# DMX start addresses for each SlimPAR 56 fixture (1-based, as set on the light).
+# In 7-channel mode each fixture occupies 7 addresses, so space them 8 apart
+# to leave a 1-address gap (common practice to avoid overlap confusion).
+# Addresses: 1, 8, 15, 22  — set these on each fixture's dip switches.
 fixtures:
   - name: "Par 1"
     dmx_start: 1
   - name: "Par 2"
-    dmx_start: 7
+    dmx_start: 8
   - name: "Par 3"
-    dmx_start: 13
+    dmx_start: 15
   - name: "Par 4"
-    dmx_start: 19
+    dmx_start: 22
 
 # Pioneer Opus Quad network settings
 opus_quad:
