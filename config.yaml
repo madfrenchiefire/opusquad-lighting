@@ -1,0 +1,39 @@
+# OpusQuad Lighting Configuration
+
+artnet:
+  host: "2.0.0.1"          # Art-Net controller IP (or broadcast: 2.255.255.255)
+  port: 6454
+  universe: 0
+
+# DMX start addresses for each SlimPAR 56 fixture (1-based, as set on the light)
+fixtures:
+  - name: "Par 1"
+    dmx_start: 1
+  - name: "Par 2"
+    dmx_start: 7
+  - name: "Par 3"
+    dmx_start: 13
+  - name: "Par 4"
+    dmx_start: 19
+
+# Pioneer Opus Quad network settings
+opus_quad:
+  # The Opus Quad broadcasts Pro DJ Link packets on your LAN.
+  # Set this to your machine's IP on the same subnet as the Opus Quad.
+  # Leave as "" to auto-detect.
+  local_ip: ""
+  # DJ Link beat/status packets arrive on these ports
+  beat_port: 50001
+  status_port: 50002
+  announce_port: 50000
+
+# Light show settings
+show:
+  # BPM to use when no Opus Quad signal is detected
+  fallback_bpm: 128.0
+  # Active show: "beat_strobe", "color_cycle", "pulse", "fire", "chase", "rainbow"
+  active_show: "beat_strobe"
+  # Overall brightness 0.0-1.0
+  brightness: 1.0
+  # Transition speed between colors (0.0=instant, 1.0=slow)
+  transition: 0.3
