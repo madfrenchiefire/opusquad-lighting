@@ -243,6 +243,37 @@ BUILTIN_PROFILES: dict[str, FixtureProfile] = {
         ],
         tags=["led", "color_changer"],
     ),
+
+    # ------------------------------------------------------------------
+    # MARQ ColorMax Par64 — 8-channel mode
+    #
+    #   Ch1  Master Dimmer   — overall brightness (intensity)
+    #   Ch2  Red Dimmer      — red level
+    #   Ch3  Green Dimmer    — green level
+    #   Ch4  Blue Dimmer     — blue level
+    #   Ch5  Strobe          — 0-15=off, 16-255=slow→fast
+    #   Ch6  Color Presets   — keep at 0 for manual RGB control
+    #   Ch7  Color Programs  — keep at 0 for manual RGB control
+    #   Ch8  Program Speed   — keep at 0 (only active when Ch7 > 15)
+    #
+    # Note: strobe DMX values 0-15 have no effect on this fixture,
+    # so setting strobe=0 is always safe (no accidental flash).
+    # ------------------------------------------------------------------
+    "marq_colormax_par64_8ch": _profile(
+        manufacturer="MARQ",
+        name="ColorMax Par64 (8ch)",
+        channels=[
+            ("Master Dimmer",   "intensity",    255),
+            ("Red",             "red",          0),
+            ("Green",           "green",        0),
+            ("Blue",            "blue",         0),
+            ("Strobe",          "strobe",       0),
+            ("Color Presets",   "other",        0),   # 0 = manual RGB
+            ("Color Programs",  "other",        0),   # 0 = manual RGB
+            ("Program Speed",   "other",        0),
+        ],
+        tags=["par", "led", "color_changer"],
+    ),
 }
 
 log.debug("fixture_library loaded with %d built-in profiles", len(BUILTIN_PROFILES))
