@@ -131,7 +131,7 @@ def create_app(engine, opus, config_path: str,
     # -----------------------------------------------------------------------
     @app.get("/api/config")
     async def get_config():
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             return yaml.safe_load(f)
 
     @app.post("/api/config")
@@ -338,13 +338,13 @@ def create_app(engine, opus, config_path: str,
 
 def _write_config(path: str, data: dict) -> None:
     tmp = path + ".tmp"
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         yaml.dump(data, f, default_flow_style=False, sort_keys=False)
     os.replace(tmp, path)
 
 
 def _patch_config(path: str, keys: list[str], value) -> None:
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     node = data
     for k in keys[:-1]:
