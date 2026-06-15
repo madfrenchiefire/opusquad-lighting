@@ -277,6 +277,33 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   <div class="kb-hint">1-9: shows &nbsp;|&nbsp; ←→: prev/next &nbsp;|&nbsp; Space: blackout &nbsp;|&nbsp; T: tap</div>
 </div>
 
+<!-- ═══════════════════════════════ COLOR OVERRIDE ═══════════════════════ -->
+<div class="panel color-override">
+  <div class="panel-title">Static Color Override <span id="co-badge" style="display:none;background:var(--accent2);color:#000;font-size:.7rem;padding:2px 8px;border-radius:10px;margin-left:6px">ACTIVE</span></div>
+  <div style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Overrides the active show. Press Release to return to the show.</div>
+  <div class="co-quick-row">
+    <button class="co-btn" data-r="0"   data-g="0"   data-b="255" style="background:#0044ff;color:#fff">Blue</button>
+    <button class="co-btn" data-r="255" data-g="0"   data-b="0"   style="background:#cc0000;color:#fff">Red</button>
+    <button class="co-btn" data-r="0"   data-g="200" data-b="0"   style="background:#00aa00;color:#fff">Green</button>
+    <button class="co-btn" data-r="255" data-g="255" data-b="255" style="background:#ffffff;color:#000">White</button>
+    <button class="co-btn" data-r="255" data-g="100" data-b="0"   style="background:#ff6400;color:#fff">Orange</button>
+    <button class="co-btn" data-r="160" data-g="0"   data-b="255" style="background:#9900cc;color:#fff">Purple</button>
+    <button class="co-btn" data-r="255" data-g="220" data-b="80"  style="background:#ffdc50;color:#000">Warm White</button>
+    <button class="co-btn" data-r="0"   data-g="255" data-b="200" style="background:#00ffc8;color:#000">Teal</button>
+  </div>
+  <div class="ctrl-row" style="margin-bottom:10px">
+    <span class="ctrl-lbl">Brightness</span>
+    <input type="range" id="co-brightness" min="0" max="100" value="100">
+    <span class="ctrl-val" id="co-bright-val">100%</span>
+  </div>
+  <div class="co-custom-row">
+    <label style="font-size:.8rem;color:var(--muted)">Custom:</label>
+    <input type="color" id="co-picker" value="#ffffff" title="Pick a custom color">
+    <button class="btn btn-sec btn-sm" id="co-custom-btn">Apply</button>
+    <button class="btn btn-danger btn-sm" id="co-release-btn">✖ Release</button>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════ CONTROLS ═════════════════════════════ -->
 <div class="panel controls">
   <div class="panel-title">Controls</div>
@@ -294,28 +321,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <span class="ctrl-lbl">Transition</span>
     <input type="range" id="transition" min="0" max="80" value="20">
     <span class="ctrl-val" id="trans-val">2.0 beats</span>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════ COLOR OVERRIDE ═══════════════════════ -->
-<div class="panel color-override">
-  <div class="panel-title">Static Color Override <span id="co-badge" style="display:none;background:var(--accent2);color:#000;font-size:.7rem;padding:2px 8px;border-radius:10px;margin-left:6px">ACTIVE</span></div>
-  <div style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Overrides the active show. Press Release to return to the show.</div>
-  <div class="co-quick-row">
-    <button class="co-btn" data-r="0"   data-g="0"   data-b="255" style="background:#0044ff;color:#fff">Blue</button>
-    <button class="co-btn" data-r="255" data-g="0"   data-b="0"   style="background:#cc0000;color:#fff">Red</button>
-    <button class="co-btn" data-r="0"   data-g="200" data-b="0"   style="background:#00aa00;color:#fff">Green</button>
-    <button class="co-btn" data-r="255" data-g="255" data-b="255" style="background:#ffffff;color:#000">White</button>
-    <button class="co-btn" data-r="255" data-g="100" data-b="0"   style="background:#ff6400;color:#fff">Orange</button>
-    <button class="co-btn" data-r="160" data-g="0"   data-b="255" style="background:#9900cc;color:#fff">Purple</button>
-    <button class="co-btn" data-r="255" data-g="220" data-b="80"  style="background:#ffdc50;color:#000">Warm White</button>
-    <button class="co-btn" data-r="0"   data-g="255" data-b="200" style="background:#00ffc8;color:#000">Teal</button>
-  </div>
-  <div class="co-custom-row">
-    <label style="font-size:.8rem;color:var(--muted)">Custom:</label>
-    <input type="color" id="co-picker" value="#ffffff" title="Pick a custom color">
-    <button class="btn btn-sec btn-sm" id="co-custom-btn">Apply</button>
-    <button class="btn btn-danger btn-sm" id="co-release-btn">✖ Release</button>
   </div>
 </div>
 
@@ -628,6 +633,8 @@ function applyStatus(s) {
     const pct = Math.round(s.brightness*100);
     document.getElementById('brightness').value = pct;
     document.getElementById('bright-val').textContent = pct+'%';
+    document.getElementById('co-brightness').value = pct;
+    document.getElementById('co-bright-val').textContent = pct+'%';
   }
 
   // Audio viz
@@ -685,6 +692,19 @@ bslider.addEventListener('input',()=>{
   document.getElementById('bright-val').textContent=v+'%';
   clearTimeout(brightTimer);
   brightTimer=setTimeout(()=>api('/api/brightness','POST',{value:v/100}),150);
+});
+
+// Color override brightness slider (mirrors master brightness)
+const coBslider = document.getElementById('co-brightness');
+let coBrightTimer;
+coBslider.addEventListener('input',()=>{
+  const v = coBslider.value;
+  document.getElementById('co-bright-val').textContent = v+'%';
+  // Keep in sync with main brightness slider
+  document.getElementById('brightness').value = v;
+  document.getElementById('bright-val').textContent = v+'%';
+  clearTimeout(coBrightTimer);
+  coBrightTimer = setTimeout(()=>api('/api/brightness','POST',{value:v/100}),150);
 });
 
 // Transition (local only — saved with config)
