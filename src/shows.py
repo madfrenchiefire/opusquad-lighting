@@ -374,6 +374,186 @@ class EnergyPulseShow(BaseShow):
 
 
 # ---------------------------------------------------------------------------
+# Single Spot Chase — one fixture lit at a time, marching left to right
+# ---------------------------------------------------------------------------
+class SingleSpotChaseShow(BaseShow):
+    name = "spot_chase"
+
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
+        self._color_idx = 0
+        self._last_beat_number = -1
+        self._active_idx = 0
+
+    def _render(self, dt, beat_phase, bpm, beat_number):
+        if beat_number != self._last_beat_number:
+            self._last_beat_number = beat_number
+            self._active_idx = (self._active_idx + 1) % max(len(self.fixtures), 1)
+            if beat_number == 1:
+                self._color_idx = (self._color_idx + 1) % len(COLOR_WHEEL)
+
+        color = COLOR_WHEEL[self._color_idx]
+        tail = 0.3   # fraction of beat over which the trailing glow fades
+        for i, fix in enumerate(self.fixtures):
+            if i == self._active_idx:
+                # Bright on-beat pop with short decay
+                t = beat_phase / 0.15 if beat_phase < 0.15 else 1.0
+                intensity = 1.0 - t * 0.4
+                fix.color = color
+                fix.dimmer = round(255 * intensity * self.brightness)
+            else:
+                fix.color = (0, 0, 0)
+                fix.dimmer = 0
+            fix.strobe = 0
+
+
+# ---------------------------------------------------------------------------
+# Theater Chase — alternating fixtures in a marquee pattern
+# ---------------------------------------------------------------------------
+class TheaterChaseShow(BaseShow):
+    name = "theater_chase"
+
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
+        self._offset = 0
+        self._color_idx = 0
+        self._last_beat_number = -1
+
+    def _render(self, dt, beat_phase, bpm, beat_number):
+        if beat_number != self._last_beat_number:
+            self._last_beat_number = beat_number
+            self._offset = (self._offset + 1) % 3
+            if beat_number == 1:
+                self._color_idx = (self._color_idx + 1) % len(COLOR_WHEEL)
+
+        color = COLOR_WHEEL[self._color_idx]
+        for i, fix in enumerate(self.fixtures):
+            if i % 3 == self._offset:
+                fix.color = color
+                fix.dimmer = round(255 * self.brightness)
+            else:
+                fix.color = (0, 0, 0)
+                fix.dimmer = 0
+            fix.strobe = 0
+
+
+# ---------------------------------------------------------------------------
+# Bounce Chase — single spot marching L→R→L
+# ---------------------------------------------------------------------------
+class BounceChaseShow(BaseShow):
+    name = "bounce_chase"
+
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
+        self._pos = 0
+        self._direction = 1
+        self._color_idx = 0
+        self._last_beat_number = -1
+
+    def _render(self, dt, beat_phase, bpm, beat_number):
+        n = max(len(self.fixtures), 1)
+        if beat_number != self._last_beat_number:
+            self._last_beat_number = beat_number
+            self._pos += self._direction
+            if self._pos >= n:
+                self._pos = n - 2
+                self._direction = -1
+            elif self._pos < 0:
+                self._pos = 1
+                self._direction = 1
+            if beat_number == 1:
+                self._color_idx = (self._color_idx + 1) % len(COLOR_WHEEL)
+
+        color = COLOR_WHEEL[self._color_idx]
+        for i, fix in enumerate(self.fixtures):
+            if i == self._pos:
+                fix.color = color
+                fix.dimmer = round(255 * self.brightness)
+            else:
+                # Soft bleed: adjacent fixtures at low level
+                dist = abs(i - self._pos)
+                if dist == 1:
+                    fix.color = color
+                    fix.dimmer = round(60 * self.brightness)
+                else:
+                    fix.color = (0, 0, 0)
+                    fix.dimmer = 0
+            fix.strobe = 0
+
+
+# ---------------------------------------------------------------------------
+# Color Wipe — fills fixtures one by one, then wipes them off
+# ---------------------------------------------------------------------------
+class ColorWipeShow(BaseShow):
+    name = "color_wipe"
+
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
+        self._beat_count = 0
+        self._color_idx = 0
+        self._last_beat_number = -1
+        self._lit = set()
+
+    def _render(self, dt, beat_phase, bpm, beat_number):
+        n = max(len(self.fixtures), 1)
+        total_steps = n * 2   # fill then wipe
+
+        if beat_number != self._last_beat_number:
+            self._last_beat_number = beat_number
+            step = self._beat_count % total_steps
+            if step < n:
+                self._lit.add(step)
+            else:
+                wipe_idx = step - n
+                self._lit.discard(wipe_idx)
+            self._beat_count += 1
+            if self._beat_count % total_steps == 0:
+                self._color_idx = (self._color_idx + 1) % len(COLOR_WHEEL)
+
+        color = COLOR_WHEEL[self._color_idx]
+        for i, fix in enumerate(self.fixtures):
+            if i in self._lit:
+                fix.color = color
+                fix.dimmer = round(255 * self.brightness)
+            else:
+                fix.color = (0, 0, 0)
+                fix.dimmer = 0
+            fix.strobe = 0
+
+
+# ---------------------------------------------------------------------------
+# Strobe Chase — each fixture strobes in sequence
+# ---------------------------------------------------------------------------
+class StrobeChaseShow(BaseShow):
+    name = "strobe_chase"
+
+    def __init__(self, fixtures, brightness=1.0, audio=None):
+        super().__init__(fixtures, brightness, audio)
+        self._active_idx = 0
+        self._color_idx = 0
+        self._last_beat_number = -1
+
+    def _render(self, dt, beat_phase, bpm, beat_number):
+        if beat_number != self._last_beat_number:
+            self._last_beat_number = beat_number
+            self._active_idx = (self._active_idx + 1) % max(len(self.fixtures), 1)
+            if beat_number == 1:
+                self._color_idx = (self._color_idx + 1) % len(COLOR_WHEEL)
+
+        color = COLOR_WHEEL[self._color_idx]
+        for i, fix in enumerate(self.fixtures):
+            if i == self._active_idx:
+                fix.color = color
+                fix.dimmer = round(255 * self.brightness)
+                # Strobe only on the active fixture (hardware strobe channel)
+                fix.strobe = 180
+            else:
+                fix.color = (0, 0, 0)
+                fix.dimmer = 0
+                fix.strobe = 0
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 ALL_SHOWS: dict[str, type[BaseShow]] = {
@@ -383,6 +563,8 @@ ALL_SHOWS: dict[str, type[BaseShow]] = {
         ChaseShow, FireShow, RainbowShow, ThunderstormShow,
         IdleShow,
         BassReactiveShow, SpectrumShow, EnergyPulseShow,
+        SingleSpotChaseShow, TheaterChaseShow, BounceChaseShow,
+        ColorWipeShow, StrobeChaseShow,
     ]
 }
 

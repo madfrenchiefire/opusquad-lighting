@@ -97,6 +97,10 @@ class TrackSettingUpdate(BaseModel):
 class ProfileOp(BaseModel):
     name: str
 
+class ColorOverride(BaseModel):
+    r: int = 0; g: int = 0; b: int = 0
+    clear: bool = False
+
 
 # ---------------------------------------------------------------------------
 # App factory
@@ -167,6 +171,17 @@ def create_app(engine, opus, config_path: str,
     async def tap_tempo():
         bpm = engine.tap_tempo()
         return {"ok": True, "bpm": bpm}
+
+    @app.post("/api/color_override")
+    async def color_override(body: ColorOverride):
+        if body.clear:
+            engine.clear_color_override()
+            return {"ok": True, "active": False}
+        r = max(0, min(255, body.r))
+        g = max(0, min(255, body.g))
+        b = max(0, min(255, body.b))
+        engine.set_color_override(r, g, b)
+        return {"ok": True, "active": True, "r": r, "g": g, "b": b}
 
     @app.post("/api/next_show")
     async def next_show():

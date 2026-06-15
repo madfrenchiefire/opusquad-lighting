@@ -95,6 +95,9 @@ class LightingEngine:
         self._transition_progress: float = 1.0   # 0.0=start, 1.0=done
         self._transition_rate: float = 0.0        # progress units per second
 
+        # Color override (static color, bypasses show)
+        self._color_override: Optional[tuple] = None   # (r, g, b) or None
+
         # Scene playback
         self._active_scene = None   # current Scene being held
         self._scene_fade_start: float = 0.0
@@ -157,6 +160,17 @@ class LightingEngine:
 
     def toggle_blackout(self) -> None:
         self.blackout = not self._blackout
+
+    # -----------------------------------------------------------------------
+    # Color override
+    # -----------------------------------------------------------------------
+    def set_color_override(self, r: int, g: int, b: int) -> None:
+        self._color_override = (r, g, b)
+        log.info("Color override → R%d G%d B%d", r, g, b)
+
+    def clear_color_override(self) -> None:
+        self._color_override = None
+        log.info("Color override cleared")
 
     # -----------------------------------------------------------------------
     # Show control
@@ -281,6 +295,7 @@ class LightingEngine:
             "audio": audio_data,
             "active_scene": self._active_scene.name if self._active_scene else None,
             "tap_bpm": round(self._tap_bpm, 1) if self._tap_bpm else None,
+            "color_override": list(self._color_override) if self._color_override else None,
         }
 
     # -----------------------------------------------------------------------
@@ -327,6 +342,8 @@ class LightingEngine:
             with self._lock:
                 if self._blackout:
                     self._render_blackout()
+                elif self._color_override:
+                    self._render_color_override()
                 elif self._active_scene:
                     self._render_scene(now, dt)
                 elif self._is_idle:
@@ -346,6 +363,14 @@ class LightingEngine:
         for fix in self._fixtures:
             fix.color = (0, 0, 0)
             fix.dimmer = 0
+            fix.strobe = 0
+
+    def _render_color_override(self) -> None:
+        r, g, b = self._color_override
+        dim = round(255 * self._brightness)
+        for fix in self._fixtures:
+            fix.color = (r, g, b)
+            fix.dimmer = dim
             fix.strobe = 0
 
     def _render_show(self, dt: float) -> None:
