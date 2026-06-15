@@ -334,6 +334,17 @@ def create_app(engine, opus, config_path: str,
         return {"profiles": profiles}
 
     # -----------------------------------------------------------------------
+    # Graceful shutdown
+    # -----------------------------------------------------------------------
+    @app.post("/api/shutdown")
+    async def shutdown_server():
+        fn = getattr(app.state, "shutdown_fn", None)
+        if fn:
+            import threading
+            threading.Thread(target=fn, daemon=True).start()
+        return {"ok": True}
+
+    # -----------------------------------------------------------------------
     # Art-Net discovery
     # -----------------------------------------------------------------------
     @app.post("/api/discover")

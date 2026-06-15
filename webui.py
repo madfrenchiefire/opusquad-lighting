@@ -209,7 +209,15 @@ def main():
                      profile_manager=profile_manager)
 
     # ── Graceful shutdown ──────────────────────────────────────────────────
-    def shutdown(sig, frame):
+    import uvicorn
+
+    uv_server = uvicorn.Server(uvicorn.Config(
+        app, host="0.0.0.0", port=args.port, log_level="warning"
+    ))
+    # Disable uvicorn's built-in signal handlers so ours work
+    uv_server.install_signal_handlers = lambda: None
+
+    def _do_shutdown():
         log.info("Shutting down…")
         engine.stop()
         if audio and hasattr(audio, 'stop'):
@@ -218,10 +226,16 @@ def main():
             midi_ctrl.stop()
         if osc_srv:
             osc_srv.stop()
-        sys.exit(0)
+        uv_server.should_exit = True
+
+    def shutdown(sig, frame):
+        _do_shutdown()
 
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
+
+    # Expose shutdown to web server so the /api/shutdown endpoint can call it
+    app.state.shutdown_fn = _do_shutdown
 
     # ── Start everything ───────────────────────────────────────────────────
     opus.start()
@@ -229,12 +243,12 @@ def main():
 
     url = f"http://localhost:{args.port}"
     log.info("Web UI → %s", url)
+    log.info("Press Ctrl+C in this window to stop, or use the Shutdown button in the UI.")
 
     if not args.no_browser:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
 
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
+    uv_server.run()
 
 
 if __name__ == "__main__":

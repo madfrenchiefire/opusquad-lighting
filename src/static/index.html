@@ -229,6 +229,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
   <span class="badge badge-idle" id="badge-idle">⏸ ALL PAUSED</span>
   <span class="badge badge-bo" id="badge-bo">⚫ BLACKOUT</span>
+  <button class="btn btn-sec btn-sm" id="shutdown-btn" style="margin-left:auto;background:#3b1212;border-color:#882222;color:#ff8888" title="Stop the lighting server">⏹ Shutdown</button>
   <div class="bpm-block">
     <div class="bpm-num" id="bpm-num">—</div>
     <div class="bpm-sub">BPM</div>
@@ -737,6 +738,14 @@ document.getElementById('co-custom-btn').addEventListener('click',()=>{
 });
 document.getElementById('co-release-btn').addEventListener('click',()=>
   api('/api/color_override','POST',{clear:true}).then(()=>toast('Override released')));
+
+document.getElementById('shutdown-btn').addEventListener('click',()=>{
+  if (!confirm('Stop the OpusQuad Lighting server?')) return;
+  api('/api/shutdown','POST').then(()=>{
+    toast('Server shutting down…');
+    setTimeout(()=>{ document.body.innerHTML='<div style="font-family:monospace;padding:40px;color:#aaa">Server stopped. You can close this tab.</div>'; },1500);
+  });
+});
 loadScenes();
 
 // ============================================================
